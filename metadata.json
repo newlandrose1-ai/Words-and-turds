@@ -1,0 +1,6 @@
+{
+  "name": "My Second Asshole",
+  "description": "An arcade bathroom derby where you push, strain, and strategically snip the biggest unbroken emotive poop to beat your toilet rivals.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
