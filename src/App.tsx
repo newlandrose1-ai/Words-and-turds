@@ -1,11 +1,22 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Play, Sparkles, Trophy, RotateCcw, AlertTriangle, ShieldCheck, Target, ArrowRight } from 'lucide-react';
+import {
+  Play,
+  Trophy,
+  RotateCcw,
+  AlertTriangle,
+  ShieldCheck,
+  Target,
+  ArrowLeft,
+  Utensils,
+  HelpCircle
+} from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { GameMode, GameState, PoopExpression, Competitor, DietModifier, SnipRecord } from './types/game';
-import { DIET_MODIFIERS, ALL_COMPETITORS, TOURNAMENT_STAGES } from './utils/gameData';
+import { GameMode, GameState, PoopExpression, PoopQualityTier, Competitor, DietModifier, SnipRecord } from './types/game';
+import { DIET_MODIFIERS, ALL_COMPETITORS, TOURNAMENT_STAGES, QUALITY_TIERS, QUALITY_ACHIEVEMENTS, getQualityTier } from './utils/gameData';
 import { sounds, triggerHaptic } from './utils/audio';
 import { TopNavBar } from './components/TopNavBar';
 import { PoopLogCanvas } from './components/PoopLogCanvas';
+import { PoopQualityMeter } from './components/PoopQualityMeter';
 import { CompetitorStallCard } from './components/CompetitorStallCard';
 import { StrainControlPanel } from './components/StrainControlPanel';
 import { ScoreRevealCardModal } from './components/ScoreRevealCardModal';
@@ -42,6 +53,58 @@ export default function App() {
   const [isFlushing, setIsFlushing] = useState<boolean>(false);
   const [awaitingFlush, setAwaitingFlush] = useState<boolean>(false);
 
+  // Poop Quality Meter & Emotiveness State
+  const [qualityScore, setQualityScore] = useState<number>(35);
+  const qualityTier = getQualityTier(qualityScore);
+  const prevQualityTierRef = useRef<PoopQualityTier>(qualityTier);
+  const [emotionsHistory, setEmotionsHistory] = useState<PoopExpression[]>(['curious']);
+  const fartVentAccumRef = useRef<number>(0);
+  const [unlockedAchievementIds, setUnlockedAchievementIds] = useState<string[]>(() => {
+    try {
+      const saved = localStorage.getItem('msa_achievements');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const saveAchievements = useCallback((newIds: string[]) => {
+    if (!newIds.length) return;
+    setUnlockedAchievementIds((prev) => {
+      const merged = Array.from(new Set([...prev, ...newIds]));
+      try {
+        localStorage.setItem('msa_achievements', JSON.stringify(merged));
+      } catch {
+        // ignore
+      }
+      return merged;
+    });
+  }, []);
+
+  // Quality Tier Up Audio Fanfare
+  useEffect(() => {
+    if (gameState !== 'PLAYING') return;
+    if (qualityTier !== prevQualityTierRef.current) {
+      const tierLevels: Record<PoopQualityTier, number> = {
+        coarse: 0,
+        smooth: 1,
+        artisanal: 2,
+        sentient: 3,
+        transcendent: 4,
+      };
+      const prevLvl = tierLevels[prevQualityTierRef.current] ?? 0;
+      const currLvl = tierLevels[qualityTier] ?? 0;
+      if (currLvl > prevLvl) {
+        if (qualityTier === 'transcendent') {
+          sounds.playTranscendentChoir();
+        } else {
+          sounds.playQualityTierUp(currLvl);
+        }
+      }
+      prevQualityTierRef.current = qualityTier;
+    }
+  }, [qualityTier, gameState]);
+
   // Precision Target for Precision Snip Mode
   const [precisionTargetCm, setPrecisionTargetCm] = useState<number>(26.0);
 
@@ -71,10 +134,13 @@ export default function App() {
   const waterRemaining = waterDepth - lengthCm;
 
   // Sound toggle sync
-  const handleToggleSound = () => {
-    sounds.enabled = !soundEnabled;
-    setSoundEnabled(!soundEnabled);
-  };
+  const handleToggleSound = useCallback(() => {
+    setSoundEnabled((prev) => {
+      const next = !prev;
+      sounds.enabled = next;
+      return next;
+    });
+  }, []);
 
   // Initialize competitors for a stage
   const setupStageCompetitors = useCallback((sIndex: number) => {
@@ -93,8 +159,8 @@ export default function App() {
     setCompetitors(rivals);
   }, []);
 
-  // Start a new match
-  const handleStartMatch = (mode: GameMode = 'DERBY') => {
+  // Start a new match (opens Diet Lab)
+  const handleStartMatch = useCallback((mode: GameMode = 'DERBY') => {
     sounds.playClick();
     setGameMode(mode);
     if (mode === 'PRECISION_SNIP') {
@@ -102,10 +168,10 @@ export default function App() {
       setPrecisionTargetCm(target);
     }
     setGameState('SELECT_DIET');
-  };
+  }, []);
 
-  // Confirm diet and begin the active play round
-  const handleConfirmDiet = () => {
+  // Confirm diet and begin (or restart) the active play round
+  const handleConfirmDiet = useCallback(() => {
     sounds.playClick();
     setLengthCm(0);
     setWeightGrams(0);
@@ -120,11 +186,27 @@ export default function App() {
     setExpression('curious');
     setLastSnipRecord(null);
 
+    // Reset Poop Quality & Emotiveness telemetry
+    setQualityScore(35);
+    prevQualityTierRef.current = 'coarse';
+    setEmotionsHistory(['curious']);
+    fartVentAccumRef.current = 0;
+
     setupStageCompetitors(stageIndex);
     setIsFlushing(false);
     setAwaitingFlush(false);
     setGameState('PLAYING');
-  };
+  }, [setupStageCompetitors, stageIndex]);
+
+  // Quick Play directly from Title Menu using active meal
+  const handleQuickPlay = useCallback((mode: GameMode = 'DERBY') => {
+    setGameMode(mode);
+    if (mode === 'PRECISION_SNIP') {
+      const target = Number((18 + Math.random() * 20).toFixed(1));
+      setPrecisionTargetCm(target);
+    }
+    handleConfirmDiet();
+  }, [handleConfirmDiet]);
 
   // Interactive Whirlpool Flush Action
   const handleTriggerFlush = useCallback(() => {
@@ -181,12 +263,29 @@ export default function App() {
       setCleanCut(true);
       setExpression('triumphant');
 
-      // Calculate score with Spread Asscheeks Bonus
+      // Calculate score with Spread Asscheeks Bonus & Poop Quality Multiplier
       const lengthBonus = lengthCm * 20;
       const weightBonus = weightGrams * 0.8;
       const cleanBonus = 160;
       const spreadBonus = 50; // Special style bonus for spread cheek quick pinch
-      const totalPoints = Math.round(lengthBonus + weightBonus + cleanBonus + spreadBonus);
+      const rawBase = lengthBonus + weightBonus + cleanBonus + spreadBonus;
+      const currentTierMeta = QUALITY_TIERS[qualityTier];
+      const qualityMultiplier = currentTierMeta.multiplier;
+      const qualityBonus = Math.round(rawBase * (qualityMultiplier - 1));
+      const totalPoints = Math.round(rawBase * qualityMultiplier);
+
+      // Check and award achievements
+      const newlyUnlocked: string[] = [];
+      if (qualityScore >= 55) newlyUnlocked.push('artisanal_touch');
+      if (qualityScore >= 75) newlyUnlocked.push('sentient_soul');
+      if (qualityScore >= 90) newlyUnlocked.push('golden_idol');
+      if (fartVentAccumRef.current >= 2.0) newlyUnlocked.push('fart_alchemist');
+      if (emotionsHistory.length >= 4) newlyUnlocked.push('drama_queen');
+      if (qualityScore >= 75) newlyUnlocked.push('grand_cru_pinch');
+
+      if (newlyUnlocked.length > 0) {
+        saveAchievements(newlyUnlocked);
+      }
 
       const record: SnipRecord = {
         lengthCm,
@@ -199,7 +298,13 @@ export default function App() {
         cleanBonus: cleanBonus + spreadBonus,
         weightBonus: Math.round(weightBonus),
         totalPoints,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        qualityScore,
+        qualityTier,
+        qualityMultiplier,
+        qualityBonus,
+        emotionsExperiencedCount: emotionsHistory.length,
+        unlockedAchievementIds: newlyUnlocked,
       };
 
       setLastSnipRecord(record);
@@ -210,7 +315,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 750);
     }, 280);
-  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension]);
+  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements]);
 
   // The Decisive Regular Snip Action
   const handleSnip = useCallback(() => {
@@ -225,11 +330,27 @@ export default function App() {
       setCleanCut(true);
       setExpression('triumphant');
 
-      // Calculate score
+      // Calculate score with Poop Quality Multiplier
       const lengthBonus = lengthCm * 20;
       const weightBonus = weightGrams * 0.8;
       const cleanBonus = 150;
-      const totalPoints = Math.round(lengthBonus + weightBonus + cleanBonus);
+      const rawBase = lengthBonus + weightBonus + cleanBonus;
+      const currentTierMeta = QUALITY_TIERS[qualityTier];
+      const qualityMultiplier = currentTierMeta.multiplier;
+      const qualityBonus = Math.round(rawBase * (qualityMultiplier - 1));
+      const totalPoints = Math.round(rawBase * qualityMultiplier);
+
+      // Check and award achievements
+      const newlyUnlocked: string[] = [];
+      if (qualityScore >= 55) newlyUnlocked.push('artisanal_touch');
+      if (qualityScore >= 75) newlyUnlocked.push('sentient_soul');
+      if (qualityScore >= 90) newlyUnlocked.push('golden_idol');
+      if (fartVentAccumRef.current >= 2.0) newlyUnlocked.push('fart_alchemist');
+      if (emotionsHistory.length >= 4) newlyUnlocked.push('drama_queen');
+
+      if (newlyUnlocked.length > 0) {
+        saveAchievements(newlyUnlocked);
+      }
 
       const record: SnipRecord = {
         lengthCm,
@@ -242,7 +363,13 @@ export default function App() {
         cleanBonus,
         weightBonus: Math.round(weightBonus),
         totalPoints,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        qualityScore,
+        qualityTier,
+        qualityMultiplier,
+        qualityBonus,
+        emotionsExperiencedCount: emotionsHistory.length,
+        unlockedAchievementIds: newlyUnlocked,
       };
 
       setLastSnipRecord(record);
@@ -253,7 +380,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 750);
     }, 350);
-  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension]);
+  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements]);
 
   // Handle premature snap
   const triggerPrematureSnap = useCallback(() => {
@@ -265,6 +392,7 @@ export default function App() {
     setTimeout(() => {
       sounds.playPlop(0.5);
       const penaltyScore = Math.max(0, Math.round(lengthCm * 4));
+      const penalizedQualityScore = Math.max(10, Math.round(qualityScore * 0.35));
       const record: SnipRecord = {
         lengthCm: Number((lengthCm * 0.35).toFixed(1)), // Only remaining fragment counts
         weightGrams: Number((weightGrams * 0.35).toFixed(1)),
@@ -276,7 +404,13 @@ export default function App() {
         cleanBonus: 0,
         weightBonus: 0,
         totalPoints: penaltyScore,
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        qualityScore: penalizedQualityScore,
+        qualityTier: 'coarse',
+        qualityMultiplier: 1.0,
+        qualityBonus: 0,
+        emotionsExperiencedCount: emotionsHistory.length,
+        unlockedAchievementIds: [],
       };
       setLastSnipRecord(record);
       saveRecord(record);
@@ -285,7 +419,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 800);
     }, 400);
-  }, [lengthCm, weightGrams]);
+  }, [lengthCm, weightGrams, qualityScore, emotionsHistory]);
 
   // Save record to local storage
   const saveRecord = (rec: SnipRecord) => {
@@ -300,9 +434,22 @@ export default function App() {
     });
   };
 
-  // Keyboard shortcut listeners (Space = push, Enter = snip, Shift = spread asscheeks quick snip, F = fart boost, Flush = Space/Enter)
+  // Keyboard shortcut listeners (Scoped cleanly to active gameplay + global Mute/Escape)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.code === 'KeyM') {
+        handleToggleSound();
+        return;
+      }
+      if (e.code === 'Escape') {
+        setShowHelp(false);
+        setShowHallOfFame(false);
+        return;
+      }
+
+      // Only intercept gameplay controls while actively playing with no modal open
+      if (gameState !== 'PLAYING' || showHelp || showHallOfFame) return;
+
       if (awaitingFlush) {
         if (e.code === 'Space' || e.code === 'Enter' || e.code === 'KeyF') {
           e.preventDefault();
@@ -323,15 +470,15 @@ export default function App() {
       } else if (e.code === 'Enter') {
         e.preventDefault();
         handleSnip();
-      } else if (e.code === 'KeyM') {
-        handleToggleSound();
-      } else if (e.code === 'Escape') {
-        setShowHelp(false);
-        setShowHallOfFame(false);
+      } else if (e.code === 'KeyR') {
+        e.preventDefault();
+        handleConfirmDiet();
       }
     };
 
     const handleKeyUp = (e: KeyboardEvent) => {
+      if (gameState !== 'PLAYING') return;
+
       if (e.code === 'Space') {
         e.preventDefault();
         handlePushEnd();
@@ -351,7 +498,24 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [handlePushStart, handlePushEnd, handleFartStart, handleFartEnd, handleSnip, handleQuickSnipSpread, handleTriggerFlush, awaitingFlush, isPushing, isFarting, isSnipping]);
+  }, [
+    gameState,
+    showHelp,
+    showHallOfFame,
+    handlePushStart,
+    handlePushEnd,
+    handleFartStart,
+    handleFartEnd,
+    handleSnip,
+    handleQuickSnipSpread,
+    handleTriggerFlush,
+    handleConfirmDiet,
+    handleToggleSound,
+    awaitingFlush,
+    isPushing,
+    isFarting,
+    isSnipping
+  ]);
 
   // Active Game Loop Physics & Competitor AI Simulation
   useEffect(() => {
@@ -419,18 +583,53 @@ export default function App() {
         setTension((prev) => Math.max(0, prev - 1.8));
       }
 
-      // Update emotive expression
+      // Update Poop Quality Meter based on strain pacing & emotiveness
+      setQualityScore((prevQ) => {
+        let delta = 0;
+        if (isFarting) {
+          // Fart aeration grants smooth texture polish!
+          delta += 0.35;
+          fartVentAccumRef.current += 0.05;
+        } else if (isPushing) {
+          if (tension >= 20 && tension <= 75) {
+            // Sweet spot pacing - consistent artisanal molding
+            delta += 0.28;
+          } else if (tension > 75 && tension <= 94) {
+            // Adrenaline edge thrill!
+            delta += 0.38;
+          } else if (tension > 95) {
+            // High clench friction disrupts smooth extrusion
+            delta -= 0.65;
+          }
+        } else {
+          // Relaxing between pushes maintains quality
+          delta += 0.05;
+        }
+        return Math.min(100, Math.max(15, Number((prevQ + delta).toFixed(2))));
+      });
+
+      // Update emotive expression and record unique emotional experience
+      let nextExpr: PoopExpression = 'curious';
       if (tension > 85) {
-        setExpression('panicked');
+        nextExpr = 'panicked';
       } else if (tension > 55 || isPushing) {
-        setExpression('sweating');
+        nextExpr = 'sweating';
       } else if (lengthCm > 25) {
-        setExpression('determined');
+        nextExpr = 'determined';
       } else if (lengthCm > 10) {
-        setExpression('happy');
+        nextExpr = 'happy';
       } else {
-        setExpression('curious');
+        nextExpr = 'curious';
       }
+      setExpression(nextExpr);
+      setEmotionsHistory((prevEmotions) => {
+        if (!prevEmotions.includes(nextExpr)) {
+          // Expressive drama bonus boosts quality!
+          setQualityScore((q) => Math.min(100, q + 5.5));
+          return [...prevEmotions, nextExpr];
+        }
+        return prevEmotions;
+      });
 
       // 2. Competitor AI Simulation
       setCompetitors((prevCompetitors) => {
@@ -495,6 +694,7 @@ export default function App() {
   }, [
     gameState,
     isPushing,
+    isFarting,
     isSnipping,
     isSnapped,
     lengthCm,
@@ -536,15 +736,19 @@ export default function App() {
     setGameState('TITLE_MENU');
   };
 
+  const bestScoreRecord = bestRecords.length > 0 ? Math.max(...bestRecords.map((r) => r.totalPoints)) : 0;
+  const liveProjectedScore = Math.round(
+    (lengthCm * 20 + weightGrams * 0.8 + 150) * QUALITY_TIERS[qualityTier].multiplier
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-amber-50/50 text-slate-900">
       {/* Top Navigation Bar */}
       <TopNavBar
+        gameState={gameState}
         currentMode={gameMode}
-        onSelectMode={(mode) => {
-          setGameMode(mode);
-          handleStartMatch(mode);
-        }}
+        onGoHome={handleMainMenu}
+        onSelectMode={(mode) => handleStartMatch(mode)}
         onOpenHelp={() => setShowHelp(true)}
         onOpenRecords={() => setShowHallOfFame(true)}
         soundEnabled={soundEnabled}
@@ -552,21 +756,40 @@ export default function App() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center">
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-4 sm:py-6 flex flex-col justify-center">
         {/* TITLE MENU VIEW */}
         {gameState === 'TITLE_MENU' && (
-          <div className="max-w-3xl mx-auto w-full text-center space-y-7 py-6 sm:py-10">
-            {/* Mascot & Title Lockup */}
-            <div className="space-y-3">
-              <div className="text-6xl sm:text-7xl animate-float-bob inline-block select-none" role="img" aria-label="Porcelain Toilet Champion">
-                🚽✨
+          <div className="max-w-4xl mx-auto w-full space-y-6 py-3 sm:py-6">
+            {/* Hero Title & Player Career Summary */}
+            <div className="text-center space-y-3">
+              <div className="text-5xl sm:text-6xl animate-float-bob inline-block select-none" role="img" aria-label="Porcelain Toilet Champion">
+                🚽
               </div>
-              <h1 className="text-4xl sm:text-6xl font-display font-black tracking-tight text-amber-950">
+              <h1 className="text-4xl sm:text-5xl font-display font-black tracking-tight text-amber-950 text-balance">
                 My Second Asshole
               </h1>
-              <p className="text-base sm:text-lg text-amber-900/80 max-w-xl mx-auto leading-relaxed">
-                The high-stakes porcelain derby! Strain, produce length, and strategically snip the largest unbroken emotive poop to dominate your toilet rivals.
+              <p className="text-sm sm:text-base text-amber-900/80 max-w-xl mx-auto leading-relaxed">
+                Strain to build length, polish quality through pacing and drama, and snip cleanly before hitting the water or snapping.
               </p>
+
+              {/* Clean Unboxed Career Metadata Strip */}
+              <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3 text-xs text-slate-600 font-medium pt-1">
+                <span className="tabular-nums">{tournamentsWon} Trophies</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">{bestScoreRecord.toLocaleString()} Best Score</span>
+                <span aria-hidden="true">·</span>
+                <span className="tabular-nums">
+                  {unlockedAchievementIds.length}/{QUALITY_ACHIEVEMENTS.length} Achievements
+                </span>
+                <span aria-hidden="true">·</span>
+                <button
+                  type="button"
+                  onClick={() => setShowHallOfFame(true)}
+                  className="text-amber-800 hover:text-amber-950 font-bold underline underline-offset-2 cursor-pointer"
+                >
+                  Open Hall of Fame
+                </button>
+              </div>
             </div>
 
             {/* Game Mode Selection Cards */}
@@ -575,73 +798,114 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => handleStartMatch('DERBY')}
-                className="p-5 rounded-2xl bg-white border-2 border-amber-300 hover:border-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                className="p-5 rounded-2xl bg-white border-2 border-amber-300 hover:border-amber-500 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-3xl">🏆</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono">
-                    3 STAGES
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-amber-800">
+                      3 Stages · Tournament
+                    </span>
+                    <span className="text-2xl">🏆</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
+                    Stall Derby
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    Out-snip Taco Chad, Prune Penny, and Big Tony across three bathrooms to claim the Golden Plunger.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
-                  Stall Derby
-                </h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Compete across 3 authentic bathrooms. Out-snip Taco Chad, Prune Penny, and Big Tony for the Golden Plunger!
-                </p>
+                <div className="mt-4 text-xs font-bold text-amber-700 group-hover:translate-x-0.5 transition-transform">
+                  Select Meal & Play →
+                </div>
               </button>
 
               {/* Endless Mega-Log */}
               <button
                 type="button"
                 onClick={() => handleStartMatch('ENDLESS_LOG')}
-                className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-amber-400 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-amber-400 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-3xl">🐍</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-100 text-emerald-900 px-2 py-0.5 rounded font-mono">
-                    NO WATER CAP
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-emerald-700">
+                      No Water Cap · Endurance
+                    </span>
+                    <span className="text-2xl">🐍</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
+                    Endless Log
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    No bowl water hazard. Push your sphincter tensile strength to the limit for a monster continuous log.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
-                  Endless Log
-                </h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Test the limits of your sphincter tensile strength. Push out the longest unbroken monster continuous log without snapping!
-                </p>
+                <div className="mt-4 text-xs font-bold text-amber-700 group-hover:translate-x-0.5 transition-transform">
+                  Select Meal & Play →
+                </div>
               </button>
 
               {/* Precision Snip */}
               <button
                 type="button"
                 onClick={() => handleStartMatch('PRECISION_SNIP')}
-                className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-amber-400 shadow-sm hover:shadow-md transition-all cursor-pointer group"
+                className="p-5 rounded-2xl bg-white border border-slate-200 hover:border-amber-400 shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col justify-between"
               >
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-3xl">🎯</span>
-                  <span className="text-[10px] font-bold uppercase tracking-wider bg-sky-100 text-sky-900 px-2 py-0.5 rounded font-mono">
-                    TARGET CM
-                  </span>
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-medium text-sky-700">
+                      Target Length · Timing
+                    </span>
+                    <span className="text-2xl">🎯</span>
+                  </div>
+                  <h2 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
+                    Precision Snip
+                  </h2>
+                  <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                    Hit the exact centimeter target demanded by the plumbing inspector without overshooting.
+                  </p>
                 </div>
-                <h3 className="text-lg font-bold text-slate-900 group-hover:text-amber-800 transition-colors">
-                  Precision Snip
-                </h3>
-                <p className="text-xs text-slate-600 mt-1 leading-relaxed">
-                  Hit the exact centimeter target demanded by the master plumbing inspector. Extreme timing required.
-                </p>
+                <div className="mt-4 text-xs font-bold text-amber-700 group-hover:translate-x-0.5 transition-transform">
+                  Select Meal & Play →
+                </div>
               </button>
             </div>
 
-            {/* Quick Play CTA */}
-            <div className="pt-2">
+            {/* Primary Action Bar + Instant Quick Play */}
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-1">
               <button
                 type="button"
-                onClick={() => handleStartMatch('DERBY')}
-                className="w-full sm:w-auto min-w-[280px] py-4 px-8 rounded-2xl font-display font-black text-white text-xl bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-600 hover:brightness-105 shadow-lg active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2.5"
+                onClick={() => handleQuickPlay('DERBY')}
+                className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-display font-black text-white text-lg bg-gradient-to-r from-amber-600 via-amber-700 to-yellow-600 hover:brightness-105 shadow-md active:scale-95 transition-all cursor-pointer inline-flex items-center justify-center gap-2.5 whitespace-nowrap"
               >
-                <Play className="w-6 h-6 fill-white" />
-                <span>START STALL DERBY</span>
+                <Play className="w-5 h-5 fill-white" />
+                <span>Quick Play ({selectedDiet.icon} {selectedDiet.name.split(' ')[0]})</span>
               </button>
+
+              <button
+                type="button"
+                onClick={() => handleStartMatch(gameMode)}
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold text-amber-950 text-sm bg-white border border-amber-300 hover:bg-amber-50 shadow-2xs transition-colors cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <Utensils className="w-4 h-4 text-amber-700" />
+                <span>Customize Meal</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowHelp(true)}
+                className="w-full sm:w-auto px-5 py-3.5 rounded-2xl font-bold text-slate-700 text-sm bg-white border border-slate-200 hover:bg-slate-50 shadow-2xs transition-colors cursor-pointer inline-flex items-center justify-center gap-2 whitespace-nowrap"
+              >
+                <HelpCircle className="w-4 h-4 text-slate-500" />
+                <span>Controls & Guide</span>
+              </button>
+            </div>
+
+            {/* Quick Controls Strip for Instant Onboarding */}
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 pt-3 border-t border-amber-200/60 text-xs text-slate-600">
+              <span><strong className="font-mono text-amber-900">[Space]</strong> Hold to Push</span>
+              <span><strong className="font-mono text-lime-800">[F]</strong> Fart Boost & Aerate</span>
+              <span><strong className="font-mono text-orange-800">[Shift]</strong> Spread & Quick Snip</span>
+              <span><strong className="font-mono text-rose-800">[Enter]</strong> Clean Snip / Flush</span>
             </div>
           </div>
         )}
@@ -649,69 +913,112 @@ export default function App() {
         {/* DIET SELECTION VIEW */}
         {gameState === 'SELECT_DIET' && (
           <DietSelector
+            gameMode={gameMode}
+            onChangeMode={(mode) => {
+              setGameMode(mode);
+              if (mode === 'PRECISION_SNIP') {
+                setPrecisionTargetCm(Number((18 + Math.random() * 20).toFixed(1)));
+              }
+            }}
             selectedDiet={selectedDiet}
             onSelectDiet={setSelectedDiet}
             onConfirm={handleConfirmDiet}
+            onBack={handleMainMenu}
             stageTitle={gameMode === 'DERBY' ? currentStage.name : undefined}
           />
         )}
 
         {/* ACTIVE PLAYING VIEW (Compact Unified Viewport) */}
         {gameState === 'PLAYING' && (
-          <div className="space-y-2.5 max-w-5xl mx-auto w-full">
-            {/* Slim Header Telemetry Bar */}
-            <div className="flex items-center justify-between gap-2 px-3 py-2 bg-white/90 backdrop-blur-xs rounded-xl border border-amber-200 shadow-2xs">
+          <div className="space-y-2.5 max-w-6xl mx-auto w-full">
+            {/* Slim Actionable Game Header Bar */}
+            <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-white/95 backdrop-blur-xs rounded-xl border border-amber-200 shadow-2xs">
               <div className="flex items-center gap-2 min-w-0">
-                <span className="text-xl shrink-0">🚽</span>
-                <div className="min-w-0">
-                  <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-500">
-                    <span className="font-bold text-amber-800 uppercase">
+                <button
+                  type="button"
+                  onClick={handleMainMenu}
+                  title="Return to Main Menu"
+                  className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-amber-950 bg-slate-100 hover:bg-amber-100 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
+                >
+                  <ArrowLeft className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">Menu</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    sounds.playClick();
+                    setGameState('SELECT_DIET');
+                  }}
+                  title="Change Pre-Derby Meal"
+                  className="px-2.5 py-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
+                >
+                  <span>{selectedDiet.icon}</span>
+                  <span className="hidden sm:inline">Meal</span>
+                </button>
+
+                <div className="min-w-0 pl-1">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500">
+                    <span className="font-bold text-amber-800">
                       {gameMode === 'DERBY'
                         ? `Round ${stageIndex + 1}/${TOURNAMENT_STAGES.length}`
                         : gameMode === 'ENDLESS_LOG'
-                        ? 'Endless Drop'
-                        : `Target ${precisionTargetCm.toFixed(1)}cm`}
+                        ? 'Endless Log'
+                        : `Target ${precisionTargetCm.toFixed(1)} cm`}
                     </span>
-                    <span>·</span>
-                    <span className="truncate">{selectedDiet.icon} {selectedDiet.name}</span>
+                    <span aria-hidden="true">·</span>
+                    <span className="truncate font-sans font-medium text-slate-700">
+                      {gameMode === 'DERBY' ? currentStage.name : 'Porcelain Battle Coliseum'}
+                    </span>
                   </div>
-                  <h2 className="text-xs sm:text-sm font-bold text-slate-900 truncate">
-                    {gameMode === 'DERBY' ? currentStage.name : 'Porcelain Battle Coliseum'}
-                  </h2>
                 </div>
               </div>
 
-              {/* Status Badge & Interactive Flush Button */}
+              {/* Quick Restart & Live State */}
               <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
-                  onClick={() => sounds.playFlush()}
-                  title="Click to flush toilet bowl"
-                  className="px-2.5 py-1 text-[11px] font-mono font-bold bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-lg border border-sky-300 transition-colors cursor-pointer flex items-center gap-1"
+                  onClick={handleConfirmDiet}
+                  title="Quick Restart Round [R]"
+                  className="px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:text-amber-950 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1"
                 >
-                  <span>💧 Flush</span>
+                  <RotateCcw className="w-3.5 h-3.5" />
+                  <span>Restart</span>
+                  <span className="hidden sm:inline text-[10px] font-mono text-slate-500">[R]</span>
                 </button>
 
                 <span
-                  className={`text-[11px] font-mono font-bold px-2.5 py-1 rounded-lg border ${
+                  className={`text-[11px] font-mono font-bold px-2.5 py-1.5 rounded-lg border ${
                     isFarting
-                      ? 'bg-lime-100 text-lime-900 border-lime-300 animate-pulse'
+                      ? 'bg-lime-100 text-lime-900 border-lime-300'
                       : isPushing
-                      ? 'bg-amber-100 text-amber-900 border-amber-300 animate-pulse'
+                      ? 'bg-amber-100 text-amber-900 border-amber-300'
                       : 'bg-slate-100 text-slate-700 border-slate-200'
                   }`}
                 >
-                  {isFarting ? '💨 FART THRUST!' : isPushing ? '🔥 STRAINING' : 'POISED'}
+                  {isFarting ? '💨 FART THRUST' : isPushing ? '🔥 STRAINING' : 'POISED'}
                 </span>
               </div>
             </div>
 
-            {/* Unified 2-Column Battle Arena: Fits on One Screen */}
+            {/* Unified 2-Column Battle Arena: Fits Cleanly on One Screen */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 items-start">
-              {/* Left / Center 8 Columns: Main Toilet Stage & Docked Controls */}
+              {/* Left / Center 8 Columns: Quality Meter, Toilet Stage & Docked Controls */}
               <div className="lg:col-span-8 flex flex-col space-y-2">
-                {/* Poop Physics Canvas with Animated Toilet */}
-                <div className="relative h-[320px] sm:h-[390px] w-full">
+                {/* Live Poop Quality Meter: Emotiveness, Tier & Multiplier */}
+                <PoopQualityMeter
+                  qualityScore={qualityScore}
+                  qualityTier={qualityTier}
+                  tension={tension}
+                  isPushing={isPushing}
+                  isFarting={isFarting}
+                  emotionsCount={emotionsHistory.length}
+                  cleanCut={cleanCut}
+                  isSnapped={isSnapped}
+                />
+
+                {/* Poop Physics Canvas with Animated Toilet & Butt */}
+                <div className="relative h-[330px] sm:h-[385px] w-full">
                   <PoopLogCanvas
                     lengthCm={lengthCm}
                     weightGrams={weightGrams}
@@ -726,13 +1033,15 @@ export default function App() {
                     isFlushing={isFlushing}
                     expression={expression}
                     cleanCut={cleanCut}
+                    qualityScore={qualityScore}
+                    qualityTier={qualityTier}
                     onFlushClick={handleTriggerFlush}
                     onFlushComplete={handleFlushComplete}
                   />
 
                   {/* Water Danger Alert Banner */}
                   {waterRemaining <= 8 && !isSnapped && !isSnipping && (
-                    <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-rose-600 text-white font-mono font-bold text-[11px] shadow-md animate-bounce flex items-center gap-1 z-20">
+                    <div className="absolute top-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-rose-600 text-white font-mono font-bold text-[11px] shadow-md animate-bounce flex items-center gap-1 z-20 whitespace-nowrap">
                       <AlertTriangle className="w-3.5 h-3.5" />
                       <span>WATER HAZARD! SNIP NOW!</span>
                     </div>
@@ -741,14 +1050,14 @@ export default function App() {
                   {/* Clean Snip Celebration Flash */}
                   {cleanCut && (
                     <div className="absolute inset-0 flex items-center justify-center bg-emerald-500/10 pointer-events-none z-20">
-                      <div className="p-3.5 bg-white/95 rounded-2xl shadow-xl border border-emerald-300 text-center animate-in zoom-in-75 duration-200">
+                      <div className="p-3.5 bg-white/95 rounded-2xl shadow-xl border border-emerald-300 text-center">
                         <span className="text-2xl block mb-0.5">
                           {isQuickSnipping ? '⚡🍑✂️' : '✂️✨'}
                         </span>
                         <div className="text-lg font-display font-black text-emerald-800">
                           {isQuickSnipping ? 'SPREAD & QUICK SNIP!' : 'CLEAN SNIP!'}
                         </div>
-                        <div className="text-xs font-mono text-emerald-600">
+                        <div className="text-xs font-mono text-emerald-600 tabular-nums">
                           Locked in: {lengthCm.toFixed(1)} cm · {Math.round(weightGrams)}g
                         </div>
                       </div>
@@ -780,14 +1089,35 @@ export default function App() {
                 />
               </div>
 
-              {/* Right 4 Columns: Adjacent Stalls Strip & Strategy Tips */}
-              <div className="lg:col-span-4 flex flex-col space-y-2">
+              {/* Right 4 Columns: Live Score Projection, Adjacent Stalls & Shortcuts */}
+              <div className="lg:col-span-4 flex flex-col space-y-2.5">
+                {/* Live Projected Score Card */}
+                <div className="p-3 bg-white rounded-xl border border-amber-200 flex items-center justify-between">
+                  <div>
+                    <div className="text-[11px] font-medium text-slate-500">
+                      Projected Snip Score
+                    </div>
+                    <div className="text-2xl font-black font-mono text-amber-950 tabular-nums">
+                      {isSnapped
+                        ? Math.max(0, Math.round(lengthCm * 4)).toLocaleString()
+                        : liveProjectedScore.toLocaleString()}{' '}
+                      <span className="text-xs font-semibold text-amber-700">pts</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-[11px] font-medium text-slate-500">Quality Mult</div>
+                    <div className="text-base font-black font-mono text-amber-800 tabular-nums">
+                      {isSnapped ? '1.0x' : `${QUALITY_TIERS[qualityTier].multiplier}x`}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex items-center justify-between px-1">
-                  <h3 className="text-[11px] font-bold uppercase tracking-wider text-slate-500 font-mono">
-                    Adjacent Stalls Telemetry
+                  <h3 className="text-xs font-bold text-slate-600">
+                    Adjacent Stalls Race
                   </h3>
-                  <span className="text-[10px] text-amber-700 font-mono font-semibold">
-                    Live Race
+                  <span className="text-[11px] text-amber-700 font-medium">
+                    {competitors.filter((c) => c.status === 'snipped').length}/{competitors.length} Finished
                   </span>
                 </div>
 
@@ -808,7 +1138,7 @@ export default function App() {
                       <Target className="w-3.5 h-3.5 text-sky-600" />
                       <span>Inspector Target</span>
                     </div>
-                    <div className="text-xl font-black font-mono text-sky-950">
+                    <div className="text-xl font-black font-mono text-sky-950 tabular-nums">
                       {precisionTargetCm.toFixed(1)} cm
                     </div>
                     <p className="text-[11px] text-sky-700">
@@ -817,25 +1147,18 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Quick Controls Cheat Sheet Box */}
-                <div className="p-2.5 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-950 space-y-1 font-mono">
-                  <div className="font-bold flex items-center gap-1 text-amber-900">
-                    <span>🎮 KEYBOARD SHORTCUTS:</span>
+                {/* Compact Controls Reference */}
+                <div className="p-3 bg-amber-50/80 border border-amber-200 rounded-xl text-[11px] text-amber-950 space-y-1.5 font-mono">
+                  <div className="font-bold text-amber-900 font-sans">
+                    Controls Reference
                   </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>[SPACEBAR]</span> <span className="font-semibold text-amber-900">Push / Strain</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>[F]</span> <span className="font-semibold text-lime-700">Fart Boost</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>[SHIFT]</span> <span className="font-semibold text-orange-700">Spread & Quick Snip</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700">
-                    <span>[ENTER]</span> <span className="font-semibold text-rose-700">Clean Snip</span>
-                  </div>
-                  <div className="flex justify-between text-slate-700 pt-0.5 border-t border-amber-200/60">
-                    <span>[FLUSH]</span> <span className="font-semibold text-sky-700">Enter / Space (When Dropped)</span>
+                  <div className="grid grid-cols-2 gap-x-3 gap-y-1 text-slate-700">
+                    <div><span className="font-bold text-amber-900">[SPACE]</span> Push</div>
+                    <div><span className="font-bold text-lime-800">[F]</span> Fart Boost</div>
+                    <div><span className="font-bold text-orange-800">[SHIFT]</span> Spread Snip</div>
+                    <div><span className="font-bold text-rose-800">[ENTER]</span> Snip / Flush</div>
+                    <div><span className="font-bold text-slate-900">[R]</span> Restart</div>
+                    <div><span className="font-bold text-slate-900">[M]</span> Mute Audio</div>
                   </div>
                 </div>
               </div>
@@ -912,6 +1235,7 @@ export default function App() {
         isOpen={showHallOfFame}
         onClose={() => setShowHallOfFame(false)}
         bestRecords={bestRecords}
+        unlockedAchievementIds={unlockedAchievementIds}
         tournamentsWon={tournamentsWon}
         onClearRecords={() => {
           setBestRecords([]);

@@ -121,6 +121,59 @@ class SoundEngine {
     osc.stop(now + 0.06);
   }
 
+  // Quality Tier Up Sparkle Chime (Plays on advancing quality level)
+  playQualityTierUp(tierLevel: number = 1) {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const baseFreqs = [523.25, 659.25, 783.99, 1046.50, 1318.51]; // C5, E5, G5, C6, E6
+    const baseFreq = baseFreqs[Math.min(tierLevel, baseFreqs.length - 1)];
+
+    [0, 1, 2].forEach((idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      const time = now + idx * 0.055;
+      const freq = baseFreq * (1 + idx * 0.25);
+
+      osc.frequency.setValueAtTime(freq, time);
+      osc.frequency.exponentialRampToValueAtTime(freq * 1.05, time + 0.18);
+
+      gain.gain.setValueAtTime(0, time);
+      gain.gain.linearRampToValueAtTime(0.12, time + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(time);
+      osc.stop(time + 0.24);
+    });
+  }
+
+  // Heavenly Choral Sparkle for Transcendent Golden Log (Tier 5)
+  playTranscendentChoir() {
+    const ctx = this.getContext();
+    if (!ctx) return;
+    const now = ctx.currentTime;
+    const chord = [440, 554.37, 659.25, 880]; // A major heavenly triad
+
+    chord.forEach((freq, idx) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now);
+
+      gain.gain.setValueAtTime(0, now);
+      gain.gain.linearRampToValueAtTime(0.08 / (idx + 1), now + 0.15);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.9);
+    });
+  }
+
   // THE SNIP! Sharp scissor cut / clean pinch sound
   playSnip() {
     const ctx = this.getContext();

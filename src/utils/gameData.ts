@@ -1,4 +1,4 @@
-import { Competitor, DietModifier, StageConfig } from '../types/game';
+import { Competitor, DietModifier, StageConfig, PoopQualityTier, QualityAchievement } from '../types/game';
 
 export const DIET_MODIFIERS: DietModifier[] = [
   {
@@ -192,3 +192,120 @@ export const TOURNAMENT_STAGES: StageConfig[] = [
     waterDepthCm: 60
   }
 ];
+
+export interface QualityTierInfo {
+  tier: PoopQualityTier;
+  name: string;
+  minScore: number;
+  maxScore: number;
+  multiplier: number;
+  icon: string;
+  badgeColor: string;
+  borderColor: string;
+  description: string;
+}
+
+export const QUALITY_TIERS: Record<PoopQualityTier, QualityTierInfo> = {
+  coarse: {
+    tier: 'coarse',
+    name: 'Coarse Pellet',
+    minScore: 0,
+    maxScore: 29,
+    multiplier: 1.0,
+    icon: '💩',
+    badgeColor: 'bg-stone-100 text-stone-800 border-stone-300',
+    borderColor: '#78716c',
+    description: 'Chalky texture and sluggish character. Needs smoother cadence.'
+  },
+  smooth: {
+    tier: 'smooth',
+    name: 'Smooth Nugget',
+    minScore: 30,
+    maxScore: 54,
+    multiplier: 1.2,
+    icon: '🤎',
+    badgeColor: 'bg-amber-100 text-amber-900 border-amber-300',
+    borderColor: '#b45309',
+    description: 'Consistent cylindrical form with healthy elasticity.'
+  },
+  artisanal: {
+    tier: 'artisanal',
+    name: 'Artisanal Coil',
+    minScore: 55,
+    maxScore: 74,
+    multiplier: 1.5,
+    icon: '✨',
+    badgeColor: 'bg-emerald-100 text-emerald-950 border-emerald-300',
+    borderColor: '#059669',
+    description: 'Deep mahogany gleam and charismatic curves. A blue-ribbon entry.'
+  },
+  sentient: {
+    tier: 'sentient',
+    name: 'Sentient Masterpiece',
+    minScore: 75,
+    maxScore: 89,
+    multiplier: 1.8,
+    icon: '💖',
+    badgeColor: 'bg-sky-100 text-sky-950 border-sky-300',
+    borderColor: '#0284c7',
+    description: 'Brimming with expressive emotion! Eyes sparkle with toilet philosophy.'
+  },
+  transcendent: {
+    tier: 'transcendent',
+    name: 'Transcendent Golden Log',
+    minScore: 90,
+    maxScore: 100,
+    multiplier: 2.5,
+    icon: '👑',
+    badgeColor: 'bg-amber-300 text-amber-950 border-yellow-500 shadow-amber-300/60',
+    borderColor: '#f59e0b',
+    description: 'Divine golden glint and angelic choir resonance. Maximum score multiplier!'
+  }
+};
+
+export const QUALITY_ACHIEVEMENTS: QualityAchievement[] = [
+  {
+    id: 'artisanal_touch',
+    name: 'Artisanal Touch',
+    emoji: '✨',
+    description: 'Reach 55%+ Emotive Quality with steady, rhythmic strain pacing.'
+  },
+  {
+    id: 'sentient_soul',
+    name: 'Sentient Soul',
+    emoji: '💖',
+    description: 'Produce a 75%+ Sentient Specimen with expressive emotive eyes.'
+  },
+  {
+    id: 'golden_idol',
+    name: 'The Golden Idol',
+    emoji: '👑',
+    description: 'Achieve 90%+ Transcendent Quality and unlock the 2.5x Grand Cru Multiplier!'
+  },
+  {
+    id: 'fart_alchemist',
+    name: 'Gaseous Alchemist',
+    emoji: '💨',
+    description: 'Use Fart Boost venting to relieve tension and polish quality by +20%.'
+  },
+  {
+    id: 'drama_queen',
+    name: 'Emotive Thespian',
+    emoji: '🎭',
+    description: 'Cycle through at least 4 distinct emotive expressions in a single continuous log.'
+  },
+  {
+    id: 'grand_cru_pinch',
+    name: 'Grand Cru Pinch',
+    emoji: '✂️',
+    description: 'Execute a clean snip while Poop Quality is at Sentient or Transcendent level.'
+  }
+];
+
+export function getQualityTier(score: number): PoopQualityTier {
+  if (score >= 90) return 'transcendent';
+  if (score >= 75) return 'sentient';
+  if (score >= 55) return 'artisanal';
+  if (score >= 30) return 'smooth';
+  return 'coarse';
+}

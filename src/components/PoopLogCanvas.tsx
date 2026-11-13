@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { PoopExpression } from '../types/game';
+import { PoopExpression, PoopQualityTier } from '../types/game';
 import { sounds } from '../utils/audio';
 
 interface PoopLogCanvasProps {
@@ -7,6 +7,8 @@ interface PoopLogCanvasProps {
   weightGrams: number;
   maxWaterDepthCm: number;
   tension: number; // 0 - 100
+  qualityScore?: number; // 0 - 100
+  qualityTier?: PoopQualityTier;
   isPushing: boolean;
   isFarting?: boolean;
   isSnipping: boolean;
@@ -62,6 +64,8 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
   weightGrams,
   maxWaterDepthCm,
   tension,
+  qualityScore = 50,
+  qualityTier = 'smooth',
   isPushing,
   isFarting = false,
   isSnipping,
@@ -168,8 +172,8 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
       ctx.clearRect(0, 0, width, height);
 
       const centerX = width / 2;
-      const startY = 70; // Sphincter exit point
-      const waterY = height - 68; // Water level in bowl
+      const startY = 82; // Sphincter exit point with headroom for sculpted hips & cheeks
+      const waterY = height - 66; // Water level in bowl
 
       // Smooth cheek spread interpolation
       const targetSpread = isCheekSpread ? 34 : 0;
@@ -221,7 +225,9 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
           isPushing,
           cleanCut,
           isSnapped,
-          isSeveredRef.current
+          isSeveredRef.current,
+          qualityScore,
+          qualityTier
         );
       }
 
@@ -301,6 +307,8 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
     isSnapped,
     expression,
     cleanCut,
+    qualityScore,
+    qualityTier,
     onDropImpact,
     onFlushClick
   ]);
@@ -308,7 +316,7 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
   const isSeveredAwaitingFlush = (isSnipping || isSnapped) && !isFlushing;
 
   return (
-    <div className="relative w-full h-full min-h-[360px] sm:min-h-[440px] rounded-3xl overflow-hidden bg-gradient-to-b from-sky-50 via-cyan-50 to-blue-100 shadow-inner border-2 border-amber-300/80 group">
+    <div className="relative w-full h-full rounded-3xl overflow-hidden bg-gradient-to-b from-sky-50 via-cyan-50 to-blue-100 shadow-inner border-2 border-amber-300/80 group">
       <canvas
         ref={canvasRef}
         onClick={() => {
@@ -741,7 +749,9 @@ function drawPoopSoftBody(
   isPushing: boolean,
   cleanCut: boolean,
   isSnapped: boolean,
-  isSevered: boolean
+  isSevered: boolean,
+  qualityScore: number = 50,
+  qualityTier: PoopQualityTier = 'smooth'
 ) {
   ctx.save();
 
@@ -775,18 +785,46 @@ function drawPoopSoftBody(
     rightPts.push({ x: curr.x - nx * r, y: curr.y - ny * r });
   }
 
-  // Rich organic poop gradient
+  // Quality-Based Radiant Aura Glow
+  if (qualityScore >= 75) {
+    ctx.shadowColor = qualityScore >= 90 ? 'rgba(251, 191, 36, 0.75)' : 'rgba(56, 189, 248, 0.45)';
+    ctx.shadowBlur = qualityScore >= 90 ? 18 : 10;
+  }
+
+  // Rich organic poop gradient modulated by Quality Score
   const tip = nodes[nodes.length - 1];
   const head = nodes[0];
   const poopGrad = ctx.createLinearGradient(head.x, head.y, tip.x, tip.y);
-  poopGrad.addColorStop(0, '#582b0f');
-  poopGrad.addColorStop(0.35, '#78350f');
-  poopGrad.addColorStop(0.7, '#854d0e');
-  poopGrad.addColorStop(1, '#582b0f');
+
+  if (qualityScore >= 90) {
+    // Transcendent Golden Glaze
+    poopGrad.addColorStop(0, '#78350f');
+    poopGrad.addColorStop(0.25, '#d97706');
+    poopGrad.addColorStop(0.5, '#fbbf24');
+    poopGrad.addColorStop(0.75, '#b45309');
+    poopGrad.addColorStop(1, '#78350f');
+  } else if (qualityScore >= 75) {
+    // Sentient Rich Chestnut Sheen
+    poopGrad.addColorStop(0, '#582b0f');
+    poopGrad.addColorStop(0.3, '#92400e');
+    poopGrad.addColorStop(0.65, '#b45309');
+    poopGrad.addColorStop(1, '#582b0f');
+  } else if (qualityScore >= 55) {
+    // Artisanal Warm Mahogany
+    poopGrad.addColorStop(0, '#582b0f');
+    poopGrad.addColorStop(0.35, '#78350f');
+    poopGrad.addColorStop(0.7, '#854d0e');
+    poopGrad.addColorStop(1, '#582b0f');
+  } else {
+    // Standard / Coarse
+    poopGrad.addColorStop(0, '#451a03');
+    poopGrad.addColorStop(0.4, '#582b0f');
+    poopGrad.addColorStop(1, '#451a03');
+  }
 
   ctx.fillStyle = poopGrad;
-  ctx.strokeStyle = '#381a07';
-  ctx.lineWidth = 3.5;
+  ctx.strokeStyle = qualityScore >= 90 ? '#b45309' : '#381a07';
+  ctx.lineWidth = qualityScore >= 90 ? 4 : 3.5;
   ctx.lineJoin = 'round';
 
   ctx.beginPath();
@@ -815,9 +853,14 @@ function drawPoopSoftBody(
   ctx.fill();
   ctx.stroke();
 
-  // Glossy highlight ribbon along the body
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.32)';
-  ctx.lineWidth = 4;
+  // Reset shadow for inner accents
+  ctx.shadowBlur = 0;
+
+  // Glossy highlight ribbon along the body (widens and glistens with quality)
+  const highlightAlpha = qualityScore >= 90 ? 0.75 : qualityScore >= 75 ? 0.55 : 0.32;
+  const highlightColor = qualityScore >= 90 ? `rgba(254, 240, 138, ${highlightAlpha})` : `rgba(255, 255, 255, ${highlightAlpha})`;
+  ctx.strokeStyle = highlightColor;
+  ctx.lineWidth = qualityScore >= 75 ? 5.5 : 4;
   ctx.lineCap = 'round';
   ctx.beginPath();
   for (let i = 0; i < nodes.length; i++) {
@@ -839,6 +882,23 @@ function drawPoopSoftBody(
     ctx.stroke();
   }
 
+  // Quality Sparkles for Sentient & Transcendent tiers (Floating soul motes)
+  if (qualityScore >= 75 && !isSnapped) {
+    const t = Date.now() * 0.004;
+    const sparkleCount = qualityScore >= 90 ? 4 : 2;
+    for (let s = 0; s < sparkleCount; s++) {
+      const nodeIdx = Math.floor(((s * 3 + Math.floor(t)) % Math.max(1, nodes.length - 1)));
+      const baseNode = nodes[nodeIdx];
+      if (baseNode) {
+        const sx = baseNode.x + Math.sin(t + s * 1.8) * (baseNode.radius + 12);
+        const sy = baseNode.y + Math.cos(t * 1.3 + s) * 10;
+        ctx.fillStyle = qualityScore >= 90 ? '#fde047' : '#e0f2fe';
+        ctx.font = '10px serif';
+        ctx.fillText('✨', sx, sy);
+      }
+    }
+  }
+
   // Emotive Cartoon Face positioned on leading segment
   const faceIdx = Math.max(1, nodes.length - 2);
   const faceNode = nodes[faceIdx];
@@ -850,13 +910,15 @@ function drawPoopSoftBody(
     tension,
     isPushing,
     cleanCut,
-    isSnapped
+    isSnapped,
+    qualityScore,
+    qualityTier
   );
 
   ctx.restore();
 }
 
-// Emotive cartoon face: eyes, eyebrows, teeth, mouth, crown
+// Emotive cartoon face: eyes, eyebrows, teeth, mouth, crown, quality glints
 function drawEmotiveFace(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -865,7 +927,9 @@ function drawEmotiveFace(
   tension: number,
   isPushing: boolean,
   cleanCut: boolean,
-  isSnapped: boolean
+  isSnapped: boolean,
+  qualityScore: number = 50,
+  qualityTier: PoopQualityTier = 'smooth'
 ) {
   ctx.save();
   ctx.translate(x, y);
@@ -983,7 +1047,7 @@ function drawEmotiveFace(
     ctx.fill();
     ctx.stroke();
   } else {
-    // Curious cute eyes (● ●)
+    // Curious / Happy Sentient eyes (● ●)
     ctx.fillStyle = '#ffffff';
     ctx.beginPath();
     ctx.arc(-eyeSpacing, -1, eyeRadius, 0, Math.PI * 2);
@@ -1005,6 +1069,14 @@ function drawEmotiveFace(
     ctx.arc(eyeSpacing - 1, -2, 1.5, 0, Math.PI * 2);
     ctx.fill();
 
+    // Extra anime sparkle glint if Sentient tier
+    if (qualityScore >= 75) {
+      ctx.beginPath();
+      ctx.arc(-eyeSpacing + 1.5, 0.5, 1.0, 0, Math.PI * 2);
+      ctx.arc(eyeSpacing + 1.5, 0.5, 1.0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
     // Cute smile
     ctx.strokeStyle = '#1c1917';
     ctx.lineWidth = 2;
@@ -1016,10 +1088,37 @@ function drawEmotiveFace(
     ctx.stroke();
   }
 
+  // Sentient Blushing Cheeks when quality >= 75
+  if (qualityScore >= 75 && !isSnapped) {
+    ctx.fillStyle = 'rgba(244, 63, 94, 0.45)';
+    ctx.beginPath();
+    ctx.ellipse(-eyeSpacing - 2, 4.5, 3.5, 2, 0, 0, Math.PI * 2);
+    ctx.ellipse(eyeSpacing + 2, 4.5, 3.5, 2, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // Transcendent Floating Crown during active production
+  if (qualityTier === 'transcendent' && !cleanCut && !isSnapped) {
+    ctx.fillStyle = '#fbbf24';
+    ctx.strokeStyle = '#d97706';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-10, -13);
+    ctx.lineTo(-7, -21);
+    ctx.lineTo(-3, -15);
+    ctx.lineTo(0, -23);
+    ctx.lineTo(3, -15);
+    ctx.lineTo(7, -21);
+    ctx.lineTo(10, -13);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
   ctx.restore();
 }
 
-// Gorgeous Asscheeks, Porcelain Seat & Interactive Flush Handle
+// Expressive Cartoon Butt, Sculpted Cheeks, Spreading Hands & Porcelain Seat
 function drawAsscheeksAndPorcelainSeat(
   ctx: CanvasRenderingContext2D,
   centerX: number,
@@ -1034,198 +1133,440 @@ function drawAsscheeksAndPorcelainSeat(
   flushAnimRef: React.MutableRefObject<number>
 ) {
   ctx.save();
+  const now = Date.now();
 
-  // 1. Porcelain White Toilet Seat Rim
-  ctx.fillStyle = '#ffffff';
-  ctx.strokeStyle = '#cbd5e1';
-  ctx.lineWidth = 3.5;
-  ctx.beginPath();
-  ctx.roundRect(centerX - 105, startY - 48, 210, 52, 24);
-  ctx.fill();
-  ctx.stroke();
+  // Dynamic motion offsets (clench, high-tension tremble, fart flutter)
+  const clenchIn = isPushing ? 5.5 : 0;
+  const trembleIntensity = isPushing && tension > 45 ? ((tension - 45) / 55) * 2.8 : 0;
+  const trembleX = trembleIntensity > 0 ? Math.sin(now * 0.07) * trembleIntensity : 0;
+  const trembleY = trembleIntensity > 0 ? Math.cos(now * 0.085) * (trembleIntensity * 0.7) : 0;
+  const fartFlutter = isFarting ? Math.sin(now * 0.095) * 4.5 : 0;
 
-  // Chrome Flush Handle on Left (Clickable!)
-  const isLeverDepressed = isFlushing || flushAnimRef.current > 0;
-  const leverAngle = isLeverDepressed ? 0.48 : 0; // pivot downwards 28 degrees when flushed
+  const totalSpread = Math.max(0, spreadOffset - clenchIn * 0.5) + Math.abs(fartFlutter) * 0.45;
+  const buttCX = centerX + trembleX;
+  const buttCY = startY + trembleY;
 
-  ctx.save();
-  ctx.translate(centerX - 120, startY - 24);
-  ctx.rotate(leverAngle);
-
-  // Escutcheon wall mounting plate
-  ctx.fillStyle = '#f1f5f9';
+  // 1. Porcelain Toilet Tank Lip & Ergonomic Seat Rim
+  // Rear porcelain tank shelf
+  const tankGrad = ctx.createLinearGradient(centerX - 115, startY - 85, centerX + 115, startY - 40);
+  tankGrad.addColorStop(0, '#e2e8f0');
+  tankGrad.addColorStop(0.25, '#ffffff');
+  tankGrad.addColorStop(0.75, '#f8fafc');
+  tankGrad.addColorStop(1, '#cbd5e1');
+  ctx.fillStyle = tankGrad;
   ctx.strokeStyle = '#94a3b8';
   ctx.lineWidth = 2.5;
   ctx.beginPath();
-  ctx.roundRect(-10, -8, 20, 10, 3);
+  ctx.roundRect(centerX - 118, startY - 78, 236, 44, [18, 18, 6, 6]);
   ctx.fill();
   ctx.stroke();
 
-  // Chrome Lever Arm
+  // Contoured Toilet Seat Ring (3D beveled porcelain)
+  const seatGrad = ctx.createLinearGradient(centerX - 115, startY - 46, centerX + 115, startY + 8);
+  seatGrad.addColorStop(0, '#e2e8f0');
+  seatGrad.addColorStop(0.18, '#ffffff');
+  seatGrad.addColorStop(0.5, '#f8fafc');
+  seatGrad.addColorStop(0.82, '#ffffff');
+  seatGrad.addColorStop(1, '#cbd5e1');
+
+  ctx.fillStyle = seatGrad;
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.ellipse(centerX, startY - 14, 122, 34, 0, Math.PI * 0.92, Math.PI * 2.08);
+  ctx.quadraticCurveTo(centerX + 115, startY + 12, centerX + 76, startY + 14);
+  ctx.quadraticCurveTo(centerX, startY + 4, centerX - 76, startY + 14);
+  ctx.quadraticCurveTo(centerX - 115, startY + 12, centerX - 122, startY - 14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Seat Rim Inner Highlight
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.9)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.ellipse(centerX, startY - 18, 108, 24, 0, Math.PI * 1.05, Math.PI * 1.95);
+  ctx.stroke();
+
+  // Chrome Flush Handle on Left Tank Corner (Clickable!)
+  const isLeverDepressed = isFlushing || flushAnimRef.current > 0;
+  const leverAngle = isLeverDepressed ? 0.52 : 0;
+
+  ctx.save();
+  ctx.translate(centerX - 122, startY - 52);
+  ctx.rotate(leverAngle);
+
+  // Escutcheon plate
+  ctx.fillStyle = '#f8fafc';
+  ctx.strokeStyle = '#64748b';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(-9, -7, 18, 12, 4);
+  ctx.fill();
+  ctx.stroke();
+
+  // Chrome lever arm
   ctx.strokeStyle = isLeverDepressed ? '#38bdf8' : '#cbd5e1';
-  ctx.lineWidth = 3.5;
+  ctx.lineWidth = 4;
   ctx.lineCap = 'round';
   ctx.beginPath();
   ctx.moveTo(0, 0);
-  ctx.lineTo(0, 15);
+  ctx.lineTo(0, 17);
   ctx.stroke();
 
-  // Chrome Ball Knob
-  ctx.fillStyle = isLeverDepressed ? '#0284c7' : '#94a3b8';
+  // Chrome knob
+  const knobGrad = ctx.createRadialGradient(-1.5, 16, 1, 0, 18, 6);
+  knobGrad.addColorStop(0, '#ffffff');
+  knobGrad.addColorStop(0.5, isLeverDepressed ? '#38bdf8' : '#cbd5e1');
+  knobGrad.addColorStop(1, isLeverDepressed ? '#0284c7' : '#64748b');
+  ctx.fillStyle = knobGrad;
   ctx.beginPath();
-  ctx.arc(0, 16, 5, 0, Math.PI * 2);
+  ctx.arc(0, 18, 5.5, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#64748b';
+  ctx.strokeStyle = '#475569';
   ctx.lineWidth = 1.5;
   ctx.stroke();
-
   ctx.restore();
 
-  // Pulsing hint badge next to handle when severed and awaiting flush
+  // Interactive Flush Prompt Badge next to lever when severed
   if (isSevered && !isFlushing) {
-    const pulse = 0.65 + Math.sin(Date.now() * 0.009) * 0.35;
+    const pulse = 0.7 + Math.sin(now * 0.009) * 0.3;
     ctx.fillStyle = `rgba(14, 165, 233, ${pulse * 0.95})`;
     ctx.strokeStyle = `rgba(2, 132, 199, ${pulse})`;
     ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.roundRect(centerX - 188, startY - 42, 58, 20, 8);
+    ctx.roundRect(centerX - 192, startY - 68, 60, 22, 8);
     ctx.fill();
     ctx.stroke();
 
     ctx.fillStyle = '#ffffff';
     ctx.font = '800 10px Outfit, sans-serif';
     ctx.textAlign = 'center';
-    ctx.fillText('💧 FLUSH', centerX - 159, startY - 28);
+    ctx.fillText('💧 FLUSH', centerX - 162, startY - 53);
   }
 
-  // 2. Sphincter Tension Red/Amber Aura
+  // 2. Sphincter Tension Heat Aura
   if (tension > 30) {
     const tensionRatio = (tension - 30) / 70;
-    const glowGrad = ctx.createRadialGradient(centerX, startY, 15, centerX, startY, 60);
+    const glowGrad = ctx.createRadialGradient(buttCX, buttCY, 12, buttCX, buttCY, 75);
     glowGrad.addColorStop(0, `rgba(239, 68, 68, ${tensionRatio * 0.5})`);
     glowGrad.addColorStop(1, 'rgba(239, 68, 68, 0)');
     ctx.fillStyle = glowGrad;
     ctx.beginPath();
-    ctx.arc(centerX, startY, 60, 0, Math.PI * 2);
+    ctx.arc(buttCX, buttCY, 75, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  // 3. Realistic Cartoon Asscheeks
-  const defaultSpacing = 30;
-  const cheekRadiusX = 46;
-  const cheekRadiusY = 36;
-  const clenchOffset = isPushing ? -4 : 0;
-  const leftCheekX = centerX - defaultSpacing - spreadOffset + clenchOffset;
-  const rightCheekX = centerX + defaultSpacing + spreadOffset - clenchOffset;
-  const cheekY = startY - 14;
-
-  // Asscheek gradient
-  const cheekGrad = ctx.createRadialGradient(
-    leftCheekX,
-    cheekY - 8,
-    6,
-    leftCheekX,
-    cheekY,
-    cheekRadiusX
-  );
-  if (tension > 75) {
-    cheekGrad.addColorStop(0, '#fecdd3');
-    cheekGrad.addColorStop(0.65, '#fda4af');
-    cheekGrad.addColorStop(1, '#fb7185');
-  } else {
-    cheekGrad.addColorStop(0, '#ffedd5');
-    cheekGrad.addColorStop(0.6, '#fed7aa');
-    cheekGrad.addColorStop(1, '#fdba74');
-  }
-
-  // Draw Left Butt Cheek
-  ctx.fillStyle = cheekGrad;
-  ctx.strokeStyle = '#ea580c';
-  ctx.lineWidth = 2.8;
+  // 3. Soft Cast Shadow from Butt onto Porcelain Seat
+  ctx.fillStyle = 'rgba(15, 23, 42, 0.14)';
   ctx.beginPath();
-  ctx.ellipse(leftCheekX, cheekY, cheekRadiusX, cheekRadiusY, -0.09, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Left Cheek Sheen
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.beginPath();
-  ctx.ellipse(leftCheekX - 12, cheekY - 10, 16, 9, -0.22, 0, Math.PI * 2);
+  ctx.ellipse(buttCX - 34 - totalSpread * 0.55, buttCY + 10, 44, 12, -0.06, 0, Math.PI * 2);
+  ctx.ellipse(buttCX + 34 + totalSpread * 0.55, buttCY + 10, 44, 12, 0.06, 0, Math.PI * 2);
   ctx.fill();
 
-  // Draw Right Butt Cheek
-  ctx.fillStyle = cheekGrad;
-  ctx.beginPath();
-  ctx.ellipse(rightCheekX, cheekY, cheekRadiusX, cheekRadiusY, 0.09, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 4. Sculpted Cartoon Butt Anatomy (Color shifts smoothly with strain!)
+  // Interpolate skin palette based on tension (peach -> coral flush -> beet red)
+  const skinTop = tension > 78 ? '#ffe4e6' : tension > 48 ? '#ffedd5' : '#fff3e6';
+  const skinMid = tension > 78 ? '#fda4af' : tension > 48 ? '#fecdd3' : '#fed7aa';
+  const skinShadow = tension > 78 ? '#e11d48' : tension > 48 ? '#fb7185' : '#fb923c';
+  const skinOutline = tension > 78 ? '#9f1239' : tension > 48 ? '#c2410c' : '#c2410c';
 
-  // Right Cheek Sheen
-  ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
-  ctx.beginPath();
-  ctx.ellipse(rightCheekX + 12, cheekY - 10, 16, 9, 0.22, 0, Math.PI * 2);
-  ctx.fill();
+  const cleftGap = 3 + totalSpread * 0.58;
+  const cheekSpreadShift = totalSpread * 0.65;
 
-  // Motion arrows when Cheeks are SPREAD
-  if (spreadOffset > 6) {
-    ctx.strokeStyle = '#f59e0b';
+  // Helper to build a lush sculpted half-butt path (side = -1 left, +1 right)
+  const drawSculptedCheek = (side: -1 | 1) => {
+    const cx = buttCX + side * (31 + cheekSpreadShift);
+    const innerTopX = buttCX + side * (3 + totalSpread * 0.12);
+    const hipTopX = buttCX + side * (56 + cheekSpreadShift * 0.45);
+    const outerMidX = buttCX + side * (86 + cheekSpreadShift * 0.9 + (isFarting ? fartFlutter * 0.6 : 0));
+    const lowerApexX = cx + side * 6;
+    const innerCleftX = buttCX + side * cleftGap;
+
+    const topY = buttCY - 74;
+    const hipY = buttCY - 58;
+    const midY = buttCY - 16;
+    const bottomY = buttCY + 16;
+    const cleftMidY = buttCY - 16;
+
+    const grad = ctx.createRadialGradient(
+      cx - side * 4,
+      buttCY - 30,
+      8,
+      cx,
+      buttCY - 12,
+      62
+    );
+    grad.addColorStop(0, skinTop);
+    grad.addColorStop(0.55, skinMid);
+    grad.addColorStop(1, skinShadow);
+
+    ctx.fillStyle = grad;
+    ctx.strokeStyle = skinOutline;
     ctx.lineWidth = 3;
+    ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
 
-    // Left arrows
     ctx.beginPath();
-    ctx.moveTo(leftCheekX - 38, cheekY);
-    ctx.lineTo(leftCheekX - 54, cheekY);
-    ctx.moveTo(leftCheekX - 36, cheekY - 10);
-    ctx.lineTo(leftCheekX - 48, cheekY - 12);
+    // Waist / Lower-back top bridge
+    ctx.moveTo(buttCX, topY + 2);
+    ctx.quadraticCurveTo(innerTopX + side * 24, topY - 4, hipTopX, hipY);
+    // Outer hip flowing into plump upper-outer glute
+    ctx.bezierCurveTo(
+      hipTopX + side * 26, hipY + 12,
+      outerMidX + side * 6, midY - 12,
+      outerMidX, midY
+    );
+    // Lush round lower butt curve resting on seat
+    ctx.bezierCurveTo(
+      outerMidX - side * 2, bottomY + 4,
+      lowerApexX + side * 22, bottomY + 8,
+      innerCleftX + side * 8, bottomY - 4
+    );
+    // Inward gluteal fold rising back into the cleft
+    ctx.bezierCurveTo(
+      innerCleftX + side * 2, bottomY - 10,
+      innerCleftX, cleftMidY + 8,
+      innerCleftX, cleftMidY
+    );
+    ctx.closePath();
+    ctx.fill();
+
+    // Draw outer silhouette stroke cleanly (keep top center seamless)
+    ctx.beginPath();
+    ctx.moveTo(buttCX, topY + 2);
+    ctx.quadraticCurveTo(innerTopX + side * 24, topY - 4, hipTopX, hipY);
+    ctx.bezierCurveTo(
+      hipTopX + side * 26, hipY + 12,
+      outerMidX + side * 6, midY - 12,
+      outerMidX, midY
+    );
+    ctx.bezierCurveTo(
+      outerMidX - side * 2, bottomY + 4,
+      lowerApexX + side * 22, bottomY + 8,
+      innerCleftX + side * 8, bottomY - 4
+    );
+    ctx.bezierCurveTo(
+      innerCleftX + side * 2, bottomY - 10,
+      innerCleftX, cleftMidY + 8,
+      innerCleftX, cleftMidY - 8
+    );
     ctx.stroke();
 
-    // Right arrows
+    // Inner Cleft Y-Crease Shadow
+    ctx.strokeStyle = tension > 78 ? 'rgba(159, 18, 57, 0.55)' : 'rgba(154, 52, 18, 0.45)';
+    ctx.lineWidth = 2.4;
     ctx.beginPath();
-    ctx.moveTo(rightCheekX + 38, cheekY);
-    ctx.lineTo(rightCheekX + 54, cheekY);
-    ctx.moveTo(rightCheekX + 36, cheekY - 10);
-    ctx.lineTo(rightCheekX + 48, cheekY - 12);
+    ctx.moveTo(buttCX, buttCY - 46);
+    ctx.quadraticCurveTo(
+      buttCX + side * (2 + totalSpread * 0.2),
+      buttCY - 30,
+      innerCleftX,
+      cleftMidY - 4
+    );
     ctx.stroke();
+
+    // Glossy Specular Highlight Crescent on Cheek Crest
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.42)';
+    ctx.beginPath();
+    ctx.ellipse(
+      cx - side * 2,
+      buttCY - 28,
+      19,
+      11,
+      side * 0.25,
+      0,
+      Math.PI * 2
+    );
+    ctx.fill();
+
+    // Soft Secondary Rim Sheen on Lower Curve
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.35)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(cx + side * 12, buttCY - 8, 22, side === -1 ? Math.PI * 0.55 : Math.PI * 0.1, side === -1 ? Math.PI * 0.9 : Math.PI * 0.45);
+    ctx.stroke();
+
+    // Cute Lower-Back Dimple of Venus
+    ctx.strokeStyle = tension > 78 ? 'rgba(190, 18, 60, 0.4)' : 'rgba(194, 65, 12, 0.32)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(buttCX + side * 22, buttCY - 55, 4.5, 0.2 * Math.PI, 0.8 * Math.PI);
+    ctx.stroke();
+
+    // Muscle Flex Arcs when Straining!
+    if (isPushing) {
+      ctx.strokeStyle = tension > 70 ? 'rgba(159, 18, 57, 0.45)' : 'rgba(194, 65, 12, 0.35)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.arc(cx + side * 10, buttCY - 22, 16, side === -1 ? 1.8 : 0.7, side === -1 ? 2.5 : 1.4);
+      ctx.stroke();
+    }
+  };
+
+  // Seamless upper lower-back bridge fill before stroking individual cheeks
+  ctx.fillStyle = skinTop;
+  ctx.beginPath();
+  ctx.roundRect(buttCX - 54 - cheekSpreadShift * 0.4, buttCY - 75, 108 + cheekSpreadShift * 0.8, 38, 16);
+  ctx.fill();
+
+  // Draw Left & Right Sculpted Cheeks
+  drawSculptedCheek(-1);
+  drawSculptedCheek(1);
+
+  // Subtle Lower-Back Vertical Spine Groove
+  ctx.strokeStyle = tension > 78 ? 'rgba(190, 18, 60, 0.25)' : 'rgba(194, 65, 12, 0.2)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(buttCX, buttCY - 70);
+  ctx.lineTo(buttCX, buttCY - 46);
+  ctx.stroke();
+
+  // 5. Pulsing Comic Effort Vein Marks (💢) when Tension > 65%
+  if (tension > 65 && !isSevered) {
+    const pulseScale = 0.85 + Math.sin(now * 0.02) * 0.2;
+    const drawStrainVein = (vx: number, vy: number) => {
+      ctx.save();
+      ctx.translate(vx, vy);
+      ctx.scale(pulseScale, pulseScale);
+      ctx.strokeStyle = '#be123c';
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      for (let q = 0; q < 4; q++) {
+        ctx.rotate(Math.PI / 2);
+        ctx.beginPath();
+        ctx.moveTo(2, 2);
+        ctx.quadraticCurveTo(4, 5, 7, 3);
+        ctx.stroke();
+      }
+      ctx.restore();
+    };
+    drawStrainVein(buttCX - 56 - cheekSpreadShift * 0.5, buttCY - 46);
+    if (tension > 82) {
+      drawStrainVein(buttCX + 56 + cheekSpreadShift * 0.5, buttCY - 46);
+    }
   }
 
-  // 4. Central Aperture Sphincter Rim
-  const ringWidth = (isPushing ? 38 : 32) + spreadOffset * 0.45;
-  const ringHeight = isPushing ? 19 : 15;
+  // 6. Central Pleated Sphincter Aperture
+  const ringWidth = isSevered ? 22 : (isPushing ? 33 : 27) + totalSpread * 0.35;
+  const ringHeight = isSevered ? 9 : isPushing ? 16 : 12;
 
-  const rimGrad = ctx.createRadialGradient(centerX, startY, 4, centerX, startY, ringWidth);
+  // Outer muscular sphincter halo
+  const rimGrad = ctx.createRadialGradient(buttCX, buttCY, 3, buttCX, buttCY, ringWidth);
   if (tension > 75) {
-    rimGrad.addColorStop(0, '#f87171');
-    rimGrad.addColorStop(1, '#b91c1c');
-  } else {
     rimGrad.addColorStop(0, '#fca5a5');
-    rimGrad.addColorStop(1, '#dc2626');
+    rimGrad.addColorStop(0.55, '#ef4444');
+    rimGrad.addColorStop(1, '#991b1b');
+  } else {
+    rimGrad.addColorStop(0, '#fecaca');
+    rimGrad.addColorStop(0.55, '#f87171');
+    rimGrad.addColorStop(1, '#b91c1c');
   }
 
   ctx.fillStyle = rimGrad;
   ctx.beginPath();
-  ctx.ellipse(centerX, startY, ringWidth, ringHeight, 0, 0, Math.PI * 2);
+  ctx.ellipse(buttCX, buttCY, ringWidth, ringHeight, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Inner aperture
-  ctx.fillStyle = '#451a03';
+  // Radial sphincter pucker folds
+  ctx.strokeStyle = 'rgba(127, 29, 29, 0.45)';
+  ctx.lineWidth = 1.4;
+  const foldCount = 10;
+  for (let f = 0; f < foldCount; f++) {
+    const a = (f * Math.PI * 2) / foldCount;
+    ctx.beginPath();
+    ctx.moveTo(buttCX + Math.cos(a) * (ringWidth * 0.38), buttCY + Math.sin(a) * (ringHeight * 0.38));
+    ctx.lineTo(buttCX + Math.cos(a) * (ringWidth * 0.92), buttCY + Math.sin(a) * (ringHeight * 0.92));
+    ctx.stroke();
+  }
+
+  // Deep Inner Cavity
+  ctx.fillStyle = '#3b1206';
   ctx.beginPath();
-  ctx.ellipse(centerX, startY, ringWidth * 0.65, ringHeight * 0.55, 0, 0, Math.PI * 2);
+  ctx.ellipse(buttCX, buttCY, ringWidth * 0.62, ringHeight * 0.54, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Header Title on Seat
-  ctx.fillStyle = isCheekSpread ? '#dc2626' : '#64748b';
-  ctx.font = '700 10.5px Space Mono, monospace';
-  ctx.textAlign = 'center';
-  ctx.fillText(
-    isCheekSpread
-      ? 'CHEEKS SPREAD · QUICK PINCH ARMED'
-      : isFarting
-      ? '💨 TURBO FART BURST ENGAGED'
-      : 'SEAT POSITION LOCKED · READY TO STRAIN',
-    centerX,
-    startY - 34
-  );
+  // 7. Expressive Cartoon Hands Pulling Cheeks Wide When Spread!
+  if (spreadOffset > 3) {
+    const handAlpha = Math.min(1, spreadOffset / 12);
+    ctx.save();
+    ctx.globalAlpha = handAlpha;
+
+    const drawSpreadingHand = (side: -1 | 1) => {
+      const gripX = buttCX + side * (78 + cheekSpreadShift * 0.9);
+      const gripY = buttCY - 22;
+
+      ctx.save();
+      ctx.translate(gripX, gripY);
+      ctx.scale(side, 1); // Mirror cleanly for left (-1) and right (+1)
+
+      // Palm / wrist entering from side
+      ctx.fillStyle = '#fde68a'; // Expressive comic glove/skin tone contrast or warm peach
+      const handGrad = ctx.createLinearGradient(0, -14, 34, 18);
+      handGrad.addColorStop(0, '#fff7ed');
+      handGrad.addColorStop(0.6, '#fed7aa');
+      handGrad.addColorStop(1, '#fdba74');
+
+      ctx.fillStyle = handGrad;
+      ctx.strokeStyle = '#9a3412';
+      ctx.lineWidth = 2.4;
+      ctx.lineJoin = 'round';
+
+      // Wrist + Palm
+      ctx.beginPath();
+      ctx.moveTo(34, -10);
+      ctx.quadraticCurveTo(18, -18, 6, -14);
+      ctx.quadraticCurveTo(-2, -6, 2, 10);
+      ctx.quadraticCurveTo(14, 18, 34, 10);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Gripping Thumb above
+      ctx.beginPath();
+      ctx.ellipse(6, -16, 10, 5.5, -0.35, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // 4 Curled Fingers pressing inward onto cheek flank
+      const fingerOffsets = [-7, -1, 5, 11];
+      for (let fi = 0; fi < fingerOffsets.length; fi++) {
+        const fy = fingerOffsets[fi];
+        ctx.beginPath();
+        ctx.roundRect(-8, fy - 3, 14, 6.2, 3);
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Crisp outward cartoon speed lines
+      ctx.strokeStyle = '#f59e0b';
+      ctx.lineWidth = 2.8;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(gripX + side * 32, gripY - 8);
+      ctx.lineTo(gripX + side * 48, gripY - 11);
+      ctx.moveTo(gripX + side * 36, gripY + 2);
+      ctx.lineTo(gripX + side * 54, gripY + 2);
+      ctx.moveTo(gripX + side * 32, gripY + 12);
+      ctx.lineTo(gripX + side * 46, gripY + 15);
+      ctx.stroke();
+    };
+
+    drawSpreadingHand(-1);
+    drawSpreadingHand(1);
+    ctx.restore();
+  }
+
+  // 8. Fart Shockwave Crescents when Farting
+  if (isFarting) {
+    const waveOffset = ((now % 240) / 240) * 20;
+    ctx.strokeStyle = `rgba(132, 204, 22, ${1 - waveOffset / 22})`;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.arc(buttCX, buttCY + 8 + waveOffset, 28 + waveOffset, 0.15 * Math.PI, 0.85 * Math.PI);
+    ctx.stroke();
+  }
 
   ctx.restore();
 }

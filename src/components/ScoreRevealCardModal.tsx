@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
-import { Trophy, Award, Sparkles, RotateCcw, ArrowRight, ShieldCheck, AlertOctagon, Scale, Ruler, Zap, Wind, Droplets } from 'lucide-react';
+import { Trophy, Award, Sparkles, RotateCcw, ArrowRight, ShieldCheck, AlertOctagon, Scale, Ruler, Zap, Wind, Droplets, Crown, Heart } from 'lucide-react';
 import { Competitor, SnipRecord } from '../types/game';
+import { QUALITY_TIERS, QUALITY_ACHIEVEMENTS } from '../utils/gameData';
 import { sounds } from '../utils/audio';
 
 interface ScoreRevealCardModalProps {
@@ -62,7 +63,15 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
   const playerRank = allEntries.findIndex((e) => e.isPlayer) + 1;
   const isWinner = playerRank === 1 && !(playerRecord?.snapped);
 
-  // Calculate Overall Performance Rating Rank
+  // Extract Poop Quality Meter stats
+  const quality = playerRecord?.qualityScore ?? 50;
+  const qualityTier = playerRecord?.qualityTier || 'smooth';
+  const tierInfo = QUALITY_TIERS[qualityTier] || QUALITY_TIERS.smooth;
+  const qualityMult = playerRecord?.qualityMultiplier || tierInfo.multiplier;
+  const qualityBonus = playerRecord?.qualityBonus || 0;
+  const unlockedAchievements = playerRecord?.unlockedAchievementIds || [];
+
+  // Calculate Overall Performance Rating Rank incorporating Quality Score
   let rankGrade = 'B';
   let rankTitle = 'SOLID CONTENDER';
   let rankBadgeColor = 'from-amber-500 to-yellow-600 text-amber-950 border-amber-300';
@@ -75,26 +84,32 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
     inspectorVerdict = 'Catastrophic tensile failure. Fragmentation caused severe bowl spray.';
   } else if (playerRecord) {
     const len = playerRecord.lengthCm;
-    if (len >= 34 && isWinner) {
+    if (qualityTier === 'transcendent' || (len >= 34 && isWinner)) {
       rankGrade = 'S+';
-      rankTitle = 'LEGENDARY PORCELAIN TITAN';
+      rankTitle = qualityTier === 'transcendent' ? 'TRANSCENDENT GOLDEN TITAN' : 'LEGENDARY PORCELAIN TITAN';
       rankBadgeColor = 'from-amber-400 via-yellow-300 to-amber-500 text-amber-950 border-yellow-400 shadow-amber-300/50';
-      inspectorVerdict = 'Architectural masterpiece. Epic hydrodynamic length, zero skid friction, thunderous ceramic thunk.';
-    } else if (len >= 28) {
-      rankGrade = 'A';
-      rankTitle = 'MAJESTIC FIBER BEAST';
-      rankBadgeColor = 'from-emerald-400 to-teal-600 text-emerald-950 border-emerald-300 shadow-emerald-200';
-      inspectorVerdict = 'Superb tensile fiber alignment. Smooth exit trajectory with minimal bowl turbulence.';
-    } else if (len >= 20) {
+      inspectorVerdict =
+        qualityTier === 'transcendent'
+          ? 'Supreme celestial quality. Iridescent golden glaze, heavenly aromatic cadence, and historic 2.5x multiplier!'
+          : 'Architectural masterpiece. Epic hydrodynamic length, zero skid friction, thunderous ceramic thunk.';
+    } else if (qualityTier === 'sentient' || len >= 28) {
+      rankGrade = 'A+';
+      rankTitle = qualityTier === 'sentient' ? 'SENTIENT MASTERPIECE' : 'MAJESTIC FIBER BEAST';
+      rankBadgeColor = 'from-sky-400 to-blue-600 text-sky-950 border-sky-300 shadow-sky-200';
+      inspectorVerdict =
+        qualityTier === 'sentient'
+          ? 'Deep soulful emotiveness! The specimen radiated charismatic presence, glowing anime glints, and silky luster.'
+          : 'Superb tensile fiber alignment. Smooth exit trajectory with minimal bowl turbulence.';
+    } else if (len >= 20 || qualityTier === 'artisanal') {
       rankGrade = 'B';
-      rankTitle = 'COMPETENT LOG';
-      rankBadgeColor = 'from-blue-400 to-indigo-600 text-blue-950 border-blue-300';
-      inspectorVerdict = 'Solid commercial grade piece. Handled the drop cleanly with moderate water displacement.';
+      rankTitle = qualityTier === 'artisanal' ? 'ARTISANAL BLUE RIBBON' : 'COMPETENT LOG';
+      rankBadgeColor = 'from-emerald-400 to-teal-600 text-emerald-950 border-emerald-300 shadow-emerald-200';
+      inspectorVerdict = 'Solid artisanal grade piece. Handled the drop cleanly with moderate water displacement.';
     } else {
       rankGrade = 'C';
       rankTitle = 'NUGGET CLASS';
       rankBadgeColor = 'from-slate-400 to-slate-600 text-slate-100 border-slate-300';
-      inspectorVerdict = 'Conservative snip. Recommend increased dietary bran and bolder sphincter endurance.';
+      inspectorVerdict = 'Conservative snip. Recommend increased dietary bran, steady pacing, and bolder sphincter endurance.';
     }
   }
 
@@ -102,12 +117,16 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
     // Stamp stamp-reveal delay
     const t = setTimeout(() => {
       setStampRevealed(true);
-      if (isWinner) {
+      if (qualityTier === 'transcendent') {
+        sounds.playTranscendentChoir();
+      } else if (isWinner) {
         sounds.playFanfare();
+      }
+      if (isWinner || qualityTier === 'transcendent') {
         try {
           confetti({
-            particleCount: 90,
-            spread: 80,
+            particleCount: qualityTier === 'transcendent' ? 120 : 90,
+            spread: 85,
             origin: { y: 0.6 }
           });
         } catch {
@@ -117,7 +136,7 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
     }, 350);
 
     return () => clearTimeout(t);
-  }, [isWinner]);
+  }, [isWinner, qualityTier]);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto">
@@ -146,7 +165,7 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
         </div>
 
         {/* The Stylized Performance Rating Grade Card */}
-        <div className="relative p-4 rounded-2xl bg-white border-2 border-amber-200/90 shadow-sm mb-4 overflow-hidden">
+        <div className="relative p-4 rounded-2xl bg-white border-2 border-amber-200/90 shadow-sm mb-3.5 overflow-hidden">
           {/* Background Decorative Stamp */}
           <div className="flex items-center justify-between gap-3">
             <div className="space-y-1 min-w-0">
@@ -172,24 +191,32 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
             </div>
           </div>
 
-          {/* Quick Stylized Flushed Log Metrics */}
+          {/* Quick Stylized Flushed Log Metrics (4-Column Layout including Quality Meter) */}
           {playerRecord && (
-            <div className="grid grid-cols-3 gap-2 mt-3 pt-3 border-t border-slate-100 text-center font-mono">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3 pt-3 border-t border-slate-100 text-center font-mono">
               <div className="p-2 bg-amber-50 rounded-xl border border-amber-200/60">
                 <span className="text-[10px] text-amber-800 font-bold block">LENGTH</span>
-                <span className="text-base sm:text-lg font-black text-amber-950">
+                <span className="text-sm sm:text-base font-black text-amber-950">
                   {playerRecord.lengthCm.toFixed(1)} <span className="text-[10px]">cm</span>
                 </span>
               </div>
               <div className="p-2 bg-emerald-50 rounded-xl border border-emerald-200/60">
                 <span className="text-[10px] text-emerald-800 font-bold block">MASS</span>
-                <span className="text-base sm:text-lg font-black text-emerald-950">
+                <span className="text-sm sm:text-base font-black text-emerald-950">
                   {Math.round(playerRecord.weightGrams)} <span className="text-[10px]">g</span>
+                </span>
+              </div>
+              <div className="p-2 bg-sky-50 rounded-xl border border-sky-200/60">
+                <span className="text-[10px] text-sky-800 font-bold block">QUALITY</span>
+                <span className="text-sm sm:text-base font-black text-sky-950 flex items-center justify-center gap-0.5">
+                  <span>{tierInfo.icon}</span>
+                  <span>{Math.round(quality)}%</span>
+                  <span className="text-[10px] text-sky-700 font-semibold">({qualityMult}x)</span>
                 </span>
               </div>
               <div className="p-2 bg-yellow-50 rounded-xl border border-yellow-200/60">
                 <span className="text-[10px] text-yellow-800 font-bold block">TOTAL PTS</span>
-                <span className="text-base sm:text-lg font-black text-yellow-950">
+                <span className="text-sm sm:text-base font-black text-yellow-950">
                   {playerRecord.totalPoints}
                 </span>
               </div>
@@ -197,9 +224,60 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
           )}
         </div>
 
+        {/* Quality Meter Autopsy Callout Card */}
+        {playerRecord && (
+          <div className="p-3 bg-gradient-to-r from-amber-50 via-yellow-50/70 to-orange-50 border border-amber-200 rounded-2xl mb-3 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="text-2xl select-none">{tierInfo.icon}</span>
+              <div>
+                <div className="font-display font-black text-amber-950 flex items-center gap-1.5">
+                  <span>{tierInfo.name}</span>
+                  <span className="text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+                    {qualityMult}x Emotive Multiplier
+                  </span>
+                </div>
+                <div className="text-[11px] text-amber-900/80 leading-tight">
+                  {tierInfo.description}
+                </div>
+              </div>
+            </div>
+            {qualityBonus > 0 && (
+              <div className="text-right shrink-0 font-mono">
+                <span className="text-[10px] text-amber-700 block font-semibold">QUALITY BONUS</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-700">+{qualityBonus} pts</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Newly Unlocked Achievements in this round */}
+        {unlockedAchievements.length > 0 && (
+          <div className="p-2.5 bg-gradient-to-r from-purple-50 via-pink-50 to-amber-50 border border-purple-200 rounded-2xl mb-3 text-xs space-y-1.5">
+            <div className="text-[10px] font-mono font-bold text-purple-900 uppercase tracking-wider flex items-center gap-1">
+              <Award className="w-3.5 h-3.5 text-purple-600" />
+              <span>SPECIAL ACHIEVEMENTS UNLOCKED:</span>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {unlockedAchievements.map((achId) => {
+                const ach = QUALITY_ACHIEVEMENTS.find((a) => a.id === achId);
+                if (!ach) return null;
+                return (
+                  <span
+                    key={ach.id}
+                    className="inline-flex items-center gap-1 bg-white px-2 py-1 rounded-lg border border-purple-200 font-mono text-[11px] font-bold text-purple-950 shadow-2xs"
+                  >
+                    <span>{ach.emoji}</span>
+                    <span>{ach.name}</span>
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Flushed Turd Breakdown Tags */}
         {playerRecord && (
-          <div className="flex flex-wrap gap-1.5 mb-4 text-[11px] font-mono">
+          <div className="flex flex-wrap gap-1.5 mb-3.5 text-[11px] font-mono">
             {playerRecord.cleanCut ? (
               <span className="inline-flex items-center gap-1 bg-emerald-100 text-emerald-900 font-bold px-2.5 py-1 rounded-lg border border-emerald-200">
                 <ShieldCheck className="w-3.5 h-3.5" /> Clean Snip Cut (+150 pts)

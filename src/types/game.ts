@@ -63,6 +63,21 @@ export interface StageConfig {
   waterDepthCm: number; // distance from porcelain exit to water
 }
 
+export type PoopQualityTier =
+  | 'coarse'        // 0 - 29%
+  | 'smooth'        // 30 - 54%
+  | 'artisanal'     // 55 - 74%
+  | 'sentient'      // 75 - 89%
+  | 'transcendent'; // 90 - 100%
+
+export interface QualityAchievement {
+  id: string;
+  name: string;
+  emoji: string;
+  description: string;
+  unlockedAt?: number;
+}
+
 export interface SnipRecord {
   lengthCm: number;
   weightGrams: number;
@@ -75,4 +90,10 @@ export interface SnipRecord {
   weightBonus: number;
   totalPoints: number;
   timestamp: number;
+  qualityScore?: number; // 0 - 100%
+  qualityTier?: PoopQualityTier;
+  qualityMultiplier?: number; // 1.0x - 2.5x
+  qualityBonus?: number;
+  emotionsExperiencedCount?: number;
+  unlockedAchievementIds?: string[];
 }
