@@ -122,9 +122,63 @@ export const DietSelector: React.FC<DietSelectorProps> = ({
                 )}
               </div>
 
-              <p className="text-xs text-slate-600 mb-3 leading-relaxed">
+              <p className="text-xs text-slate-600 mb-2.5 leading-relaxed">
                 {diet.description}
               </p>
+
+              {/* Visual Specimen Swatch & Inclusion Preview */}
+              <div className="flex items-center gap-2 mb-2.5 text-[11px] text-slate-700">
+                <span
+                  aria-hidden="true"
+                  className="inline-flex items-center gap-0.5 px-1.5 py-1 rounded-md border border-black/15 shrink-0"
+                  style={{
+                    backgroundColor:
+                      diet.id === 'ghost_pepper'
+                        ? '#7f1d1d'
+                        : diet.id === 'mega_fiber'
+                        ? '#6b4423'
+                        : diet.id === 'triple_espresso'
+                        ? '#2c1509'
+                        : diet.id === 'cheesy_curry'
+                        ? '#854d0e'
+                        : '#5c2d11'
+                  }}
+                >
+                  {diet.id === 'ghost_pepper' && (
+                    <>
+                      <span className="w-2 h-1.5 rounded-xs bg-red-500 inline-block" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />
+                    </>
+                  )}
+                  {diet.id === 'balanced' && (
+                    <>
+                      <span className="w-2 h-1 rounded-full bg-amber-200 inline-block" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 inline-block" />
+                    </>
+                  )}
+                  {diet.id === 'mega_fiber' && (
+                    <>
+                      <span className="w-2.5 h-0.5 bg-amber-400 rotate-12 inline-block" />
+                      <span className="w-1 h-1 rounded-full bg-amber-100 inline-block" />
+                    </>
+                  )}
+                  {diet.id === 'triple_espresso' && (
+                    <>
+                      <span className="w-2.5 h-1 rounded-full bg-amber-500/80 inline-block" />
+                      <span className="w-1 h-1 rounded-full bg-stone-950 inline-block" />
+                    </>
+                  )}
+                  {diet.id === 'cheesy_curry' && (
+                    <>
+                      <span className="w-2 h-1.5 rounded-full bg-amber-400 inline-block" />
+                      <span className="w-1.5 h-1.5 rounded-full bg-yellow-300 inline-block" />
+                    </>
+                  )}
+                </span>
+                <span className="truncate font-medium text-amber-950/85">
+                  {diet.visualVariantLabel}
+                </span>
+              </div>
 
               {/* Clean Visual Stat Comparison Bars */}
               <div className="grid grid-cols-3 gap-2 pt-2 border-t border-slate-200/70 text-[10px] font-mono">

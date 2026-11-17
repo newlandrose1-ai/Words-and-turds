@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import confetti from 'canvas-confetti';
 import { Trophy, Award, Sparkles, RotateCcw, ArrowRight, ShieldCheck, AlertOctagon, Scale, Ruler, Zap, Wind, Droplets, Crown, Heart } from 'lucide-react';
 import { Competitor, SnipRecord } from '../types/game';
-import { QUALITY_TIERS, QUALITY_ACHIEVEMENTS } from '../utils/gameData';
+import { DIET_MODIFIERS, QUALITY_TIERS, QUALITY_ACHIEVEMENTS } from '../utils/gameData';
 import { sounds } from '../utils/audio';
 
 interface ScoreRevealCardModalProps {
@@ -70,6 +70,9 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
   const qualityMult = playerRecord?.qualityMultiplier || tierInfo.multiplier;
   const qualityBonus = playerRecord?.qualityBonus || 0;
   const unlockedAchievements = playerRecord?.unlockedAchievementIds || [];
+  const mealModifier = playerRecord?.dietId
+    ? DIET_MODIFIERS.find((d) => d.id === playerRecord.dietId)
+    : undefined;
 
   // Calculate Overall Performance Rating Rank incorporating Quality Score
   let rankGrade = 'B';
@@ -297,6 +300,13 @@ export const ScoreRevealCardModal: React.FC<ScoreRevealCardModalProps> = ({
             <span className="inline-flex items-center gap-1 bg-sky-100 text-sky-900 font-bold px-2.5 py-1 rounded-lg border border-sky-200">
               <Droplets className="w-3.5 h-3.5" /> Heavy Thunk Splash Displaced
             </span>
+
+            {mealModifier && (
+              <span className="inline-flex items-center gap-1 bg-amber-100 text-amber-950 font-bold px-2.5 py-1 rounded-lg border border-amber-300">
+                <span>{mealModifier.icon}</span>
+                <span>{mealModifier.visualVariantLabel}</span>
+              </span>
+            )}
           </div>
         )}
 

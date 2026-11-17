@@ -50,6 +50,8 @@ export interface DietModifier {
   tensionRiseMult: number;
   bonusWeightMult: number;
   description: string;
+  visualVariantLabel: string;
+  visualCue: string;
 }
 
 export interface StageConfig {
@@ -90,6 +92,8 @@ export interface SnipRecord {
   weightBonus: number;
   totalPoints: number;
   timestamp: number;
+  dietId?: string;
+  dietName?: string;
   qualityScore?: number; // 0 - 100%
   qualityTier?: PoopQualityTier;
   qualityMultiplier?: number; // 1.0x - 2.5x

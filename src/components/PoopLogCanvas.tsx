@@ -7,6 +7,7 @@ interface PoopLogCanvasProps {
   weightGrams: number;
   maxWaterDepthCm: number;
   tension: number; // 0 - 100
+  dietId?: string;
   qualityScore?: number; // 0 - 100
   qualityTier?: PoopQualityTier;
   isPushing: boolean;
@@ -64,6 +65,7 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
   weightGrams,
   maxWaterDepthCm,
   tension,
+  dietId = 'balanced',
   qualityScore = 50,
   qualityTier = 'smooth',
   isPushing,
@@ -215,7 +217,7 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
         onFlushComplete
       );
 
-      // 3. Draw Poop Soft-Body Mesh with Organic Shading & Emotive Face
+      // 3. Draw Poop Soft-Body Mesh with Meal Variant Textures & Emotive Face
       if (nodesRef.current.length >= 2) {
         drawPoopSoftBody(
           ctx,
@@ -226,6 +228,7 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
           cleanCut,
           isSnapped,
           isSeveredRef.current,
+          dietId,
           qualityScore,
           qualityTier
         );
@@ -307,6 +310,7 @@ export const PoopLogCanvas: React.FC<PoopLogCanvasProps> = ({
     isSnapped,
     expression,
     cleanCut,
+    dietId,
     qualityScore,
     qualityTier,
     onDropImpact,
@@ -740,7 +744,12 @@ function drawPorcelainBowl(
   ctx.fillText('WATER SURFACE · THUNK SPLASH ZONE', centerX + 110, waterY - 8);
 }
 
-// Draw the animated Soft-body Poop Mesh with Catmull-Rom or Bezier Curves
+function seededRand(seed: number): number {
+  const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;
+  return x - Math.floor(x);
+}
+
+// Draw the animated Soft-body Poop Mesh with Meal-Specific Visual Variants
 function drawPoopSoftBody(
   ctx: CanvasRenderingContext2D,
   nodes: VerletNode[],
@@ -750,6 +759,7 @@ function drawPoopSoftBody(
   cleanCut: boolean,
   isSnapped: boolean,
   isSevered: boolean,
+  dietId: string = 'balanced',
   qualityScore: number = 50,
   qualityTier: PoopQualityTier = 'smooth'
 ) {
@@ -780,87 +790,168 @@ function drawPoopSoftBody(
       ny = dx / len;
     }
 
-    const r = curr.radius;
-    leftPts.push({ x: curr.x + nx * r, y: curr.y + ny * r });
-    rightPts.push({ x: curr.x - nx * r, y: curr.y - ny * r });
+    // Subtle chunky silhouette modulation for Mac & Cheese / Ghost Pepper
+    const wobbleR =
+      dietId === 'cheesy_curry'
+        ? curr.radius * (1.06 + Math.sin(i * 1.9) * 0.06)
+        : dietId === 'mega_fiber'
+        ? curr.radius * 1.04
+        : curr.radius;
+    leftPts.push({ x: curr.x + nx * wobbleR, y: curr.y + ny * wobbleR });
+    rightPts.push({ x: curr.x - nx * wobbleR, y: curr.y - ny * wobbleR });
   }
 
-  // Quality-Based Radiant Aura Glow
+  // Quality & Meal Radiant Aura Glow
   if (qualityScore >= 75) {
     ctx.shadowColor = qualityScore >= 90 ? 'rgba(251, 191, 36, 0.75)' : 'rgba(56, 189, 248, 0.45)';
     ctx.shadowBlur = qualityScore >= 90 ? 18 : 10;
+  } else if (dietId === 'ghost_pepper' && (isPushing || tension > 40)) {
+    ctx.shadowColor = 'rgba(239, 68, 68, 0.45)';
+    ctx.shadowBlur = 12;
   }
 
-  // Rich organic poop gradient modulated by Quality Score
+  // Rich organic poop gradient modulated by Meal Variant & Quality Tier
   const tip = nodes[nodes.length - 1];
   const head = nodes[0];
   const poopGrad = ctx.createLinearGradient(head.x, head.y, tip.x, tip.y);
 
   if (qualityScore >= 90) {
-    // Transcendent Golden Glaze
-    poopGrad.addColorStop(0, '#78350f');
-    poopGrad.addColorStop(0.25, '#d97706');
-    poopGrad.addColorStop(0.5, '#fbbf24');
-    poopGrad.addColorStop(0.75, '#b45309');
-    poopGrad.addColorStop(1, '#78350f');
-  } else if (qualityScore >= 75) {
-    // Sentient Rich Chestnut Sheen
-    poopGrad.addColorStop(0, '#582b0f');
-    poopGrad.addColorStop(0.3, '#92400e');
-    poopGrad.addColorStop(0.65, '#b45309');
-    poopGrad.addColorStop(1, '#582b0f');
-  } else if (qualityScore >= 55) {
-    // Artisanal Warm Mahogany
-    poopGrad.addColorStop(0, '#582b0f');
-    poopGrad.addColorStop(0.35, '#78350f');
-    poopGrad.addColorStop(0.7, '#854d0e');
+    // Transcendent Golden Glaze tinted subtly by diet
+    if (dietId === 'ghost_pepper') {
+      poopGrad.addColorStop(0, '#7f1d1d');
+      poopGrad.addColorStop(0.3, '#ea580c');
+      poopGrad.addColorStop(0.55, '#fbbf24');
+      poopGrad.addColorStop(0.85, '#dc2626');
+      poopGrad.addColorStop(1, '#7f1d1d');
+    } else if (dietId === 'triple_espresso') {
+      poopGrad.addColorStop(0, '#29150b');
+      poopGrad.addColorStop(0.3, '#b45309');
+      poopGrad.addColorStop(0.55, '#fde047');
+      poopGrad.addColorStop(0.85, '#78350f');
+      poopGrad.addColorStop(1, '#29150b');
+    } else {
+      poopGrad.addColorStop(0, '#78350f');
+      poopGrad.addColorStop(0.25, '#d97706');
+      poopGrad.addColorStop(0.5, '#fbbf24');
+      poopGrad.addColorStop(0.75, '#b45309');
+      poopGrad.addColorStop(1, '#78350f');
+    }
+  } else if (dietId === 'ghost_pepper') {
+    // Fiery Ghost Pepper Burrito Red-Sienna
+    poopGrad.addColorStop(0, '#5c1414');
+    poopGrad.addColorStop(0.35, '#991b1b');
+    poopGrad.addColorStop(0.7, '#7c2d12');
+    poopGrad.addColorStop(1, '#450a0a');
+  } else if (dietId === 'mega_fiber') {
+    // Earthy Psyllium Husk Wheat-Umber
+    poopGrad.addColorStop(0, '#4d3319');
+    poopGrad.addColorStop(0.4, '#785228');
+    poopGrad.addColorStop(0.75, '#6b4423');
+    poopGrad.addColorStop(1, '#432812');
+  } else if (dietId === 'triple_espresso') {
+    // Glossy Dark-Roast Espresso
+    poopGrad.addColorStop(0, '#1f0f08');
+    poopGrad.addColorStop(0.35, '#3b1c0e');
+    poopGrad.addColorStop(0.7, '#4a2312');
+    poopGrad.addColorStop(1, '#1a0c06');
+  } else if (dietId === 'cheesy_curry') {
+    // Rich Golden-Bronze Cheddar Mac
+    poopGrad.addColorStop(0, '#713f12');
+    poopGrad.addColorStop(0.35, '#a16207');
+    poopGrad.addColorStop(0.7, '#92400e');
     poopGrad.addColorStop(1, '#582b0f');
   } else {
-    // Standard / Coarse
-    poopGrad.addColorStop(0, '#451a03');
-    poopGrad.addColorStop(0.4, '#582b0f');
-    poopGrad.addColorStop(1, '#451a03');
+    // Balanced Morning Oatmeal & Fruit
+    if (qualityScore >= 75) {
+      poopGrad.addColorStop(0, '#582b0f');
+      poopGrad.addColorStop(0.3, '#92400e');
+      poopGrad.addColorStop(0.65, '#b45309');
+      poopGrad.addColorStop(1, '#582b0f');
+    } else if (qualityScore >= 55) {
+      poopGrad.addColorStop(0, '#582b0f');
+      poopGrad.addColorStop(0.35, '#78350f');
+      poopGrad.addColorStop(0.7, '#854d0e');
+      poopGrad.addColorStop(1, '#582b0f');
+    } else {
+      poopGrad.addColorStop(0, '#451a03');
+      poopGrad.addColorStop(0.4, '#582b0f');
+      poopGrad.addColorStop(1, '#451a03');
+    }
   }
 
   ctx.fillStyle = poopGrad;
-  ctx.strokeStyle = qualityScore >= 90 ? '#b45309' : '#381a07';
+  ctx.strokeStyle =
+    qualityScore >= 90
+      ? '#b45309'
+      : dietId === 'ghost_pepper'
+      ? '#450a0a'
+      : dietId === 'triple_espresso'
+      ? '#120804'
+      : '#381a07';
   ctx.lineWidth = qualityScore >= 90 ? 4 : 3.5;
   ctx.lineJoin = 'round';
 
-  ctx.beginPath();
-  // Draw top cap
-  if (isSevered) {
-    ctx.arc(head.x, head.y, head.radius, Math.PI, 0);
-  } else {
-    ctx.moveTo(leftPts[0].x, leftPts[0].y);
-  }
+  const buildBodyPath = () => {
+    ctx.beginPath();
+    if (isSevered) {
+      ctx.arc(head.x, head.y, head.radius, Math.PI, 0);
+    } else {
+      ctx.moveTo(leftPts[0].x, leftPts[0].y);
+    }
+    for (let i = 0; i < rightPts.length; i++) {
+      ctx.lineTo(rightPts[i].x, rightPts[i].y);
+    }
+    const rTip = tip.radius;
+    ctx.arc(tip.x, tip.y, rTip, 0, Math.PI);
+    for (let i = leftPts.length - 1; i >= 0; i--) {
+      ctx.lineTo(leftPts[i].x, leftPts[i].y);
+    }
+    ctx.closePath();
+  };
 
-  // Down right side
-  for (let i = 0; i < rightPts.length; i++) {
-    ctx.lineTo(rightPts[i].x, rightPts[i].y);
-  }
-
-  // Rounded bottom cap
-  const rTip = tip.radius;
-  ctx.arc(tip.x, tip.y, rTip, 0, Math.PI);
-
-  // Up left side
-  for (let i = leftPts.length - 1; i >= 0; i--) {
-    ctx.lineTo(leftPts[i].x, leftPts[i].y);
-  }
-
-  ctx.closePath();
+  buildBodyPath();
   ctx.fill();
   ctx.stroke();
 
   // Reset shadow for inner accents
   ctx.shadowBlur = 0;
 
-  // Glossy highlight ribbon along the body (widens and glistens with quality)
-  const highlightAlpha = qualityScore >= 90 ? 0.75 : qualityScore >= 75 ? 0.55 : 0.32;
-  const highlightColor = qualityScore >= 90 ? `rgba(254, 240, 138, ${highlightAlpha})` : `rgba(255, 255, 255, ${highlightAlpha})`;
+  // Clip inner textures & inclusions cleanly to the soft-body silhouette
+  ctx.save();
+  buildBodyPath();
+  ctx.clip();
+
+  // Meal-Specific Surface Inclusions (Corn, Red Hot Chili Skins, Fiber Weave, Crema Swirls, Macaroni)
+  drawDietPoopInclusions(ctx, nodes, dietId);
+
+  // Subtle organic segmentation rings
+  ctx.strokeStyle =
+    dietId === 'ghost_pepper' ? 'rgba(69, 10, 10, 0.35)' : 'rgba(46, 20, 6, 0.32)';
+  ctx.lineWidth = 2.2;
+  for (let i = 2; i < nodes.length - 1; i += 2) {
+    const pt = nodes[i];
+    ctx.beginPath();
+    ctx.ellipse(pt.x, pt.y, pt.radius * 0.85, 3.5, 0, 0, Math.PI);
+    ctx.stroke();
+  }
+
+  // Glossy highlight ribbon along the body (Espresso gets extra glossy crema luster!)
+  const highlightAlpha =
+    qualityScore >= 90
+      ? 0.75
+      : dietId === 'triple_espresso'
+      ? 0.62
+      : qualityScore >= 75
+      ? 0.55
+      : 0.32;
+  const highlightColor =
+    qualityScore >= 90
+      ? `rgba(254, 240, 138, ${highlightAlpha})`
+      : dietId === 'triple_espresso'
+      ? `rgba(253, 230, 138, ${highlightAlpha * 0.85})`
+      : `rgba(255, 255, 255, ${highlightAlpha})`;
   ctx.strokeStyle = highlightColor;
-  ctx.lineWidth = qualityScore >= 75 ? 5.5 : 4;
+  ctx.lineWidth = qualityScore >= 75 || dietId === 'triple_espresso' ? 5 : 3.8;
   ctx.lineCap = 'round';
   ctx.beginPath();
   for (let i = 0; i < nodes.length; i++) {
@@ -872,14 +963,28 @@ function drawPoopSoftBody(
   }
   ctx.stroke();
 
-  // Subtle organic segmentation rings
-  ctx.strokeStyle = 'rgba(46, 20, 6, 0.35)';
-  ctx.lineWidth = 2.5;
-  for (let i = 2; i < nodes.length - 1; i += 2) {
-    const pt = nodes[i];
-    ctx.beginPath();
-    ctx.ellipse(pt.x, pt.y, pt.radius * 0.85, 3.5, 0, 0, Math.PI);
-    ctx.stroke();
+  ctx.restore();
+
+  // Ghost Pepper Spicy Heat Wisps radiating off sides when pushing or high tension!
+  if (dietId === 'ghost_pepper' && !isSnapped && (isPushing || tension > 35)) {
+    const t = Date.now() * 0.006;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.55)';
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    for (let w = 0; w < 3; w++) {
+      const idx = Math.min(nodes.length - 1, Math.max(0, Math.floor((w + 1) * (nodes.length / 4))));
+      const n = nodes[idx];
+      if (!n) continue;
+      const side = w % 2 === 0 ? -1 : 1;
+      const wx = n.x + side * (n.radius + 7);
+      const wy = n.y - ((t * 14 + w * 8) % 16);
+      ctx.beginPath();
+      ctx.moveTo(wx, wy + 8);
+      ctx.quadraticCurveTo(wx + side * 5, wy + 3, wx, wy - 4);
+      ctx.stroke();
+    }
+    ctx.restore();
   }
 
   // Quality Sparkles for Sentient & Transcendent tiers (Floating soul motes)
@@ -916,6 +1021,196 @@ function drawPoopSoftBody(
   );
 
   ctx.restore();
+}
+
+// Deterministic Meal-Specific Inclusions (Corn, Red Chili Skin, Fiber Braid, Crema Swirls, Macaroni)
+function drawDietPoopInclusions(
+  ctx: CanvasRenderingContext2D,
+  nodes: VerletNode[],
+  dietId: string
+) {
+  const maxContentIndex = Math.max(0, nodes.length - 2); // Keep leading face clear
+
+  for (let i = 0; i < maxContentIndex; i++) {
+    const curr = nodes[i];
+    const next = nodes[i + 1] || curr;
+    const angle = Math.atan2(next.y - curr.y, next.x - curr.x) - Math.PI / 2;
+
+    const r1 = seededRand(i * 19 + 1);
+    const r2 = seededRand(i * 37 + 7);
+    const r3 = seededRand(i * 53 + 13);
+
+    const spreadX = (r1 - 0.5) * curr.radius * 1.25;
+    const spreadY = (r2 - 0.5) * 9;
+    const px = curr.x + spreadX;
+    const py = curr.y + spreadY;
+
+    if (dietId === 'ghost_pepper') {
+      // 1. Bright Red Hot Chili Pepper Skin Flakes
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(angle + (r3 - 0.5) * 1.8);
+      ctx.fillStyle = r1 > 0.45 ? '#ef4444' : '#dc2626';
+      ctx.strokeStyle = '#7f1d1d';
+      ctx.lineWidth = 0.9;
+      ctx.beginPath();
+      ctx.moveTo(-5, -1.5);
+      ctx.quadraticCurveTo(0, -4.5, 5.5, -1);
+      ctx.quadraticCurveTo(1, 2.8, -5, -1.5);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Chili skin glossy glint
+      ctx.fillStyle = 'rgba(254, 202, 202, 0.7)';
+      ctx.beginPath();
+      ctx.ellipse(-0.5, -1.5, 2, 0.8, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // 2. Pale Chili Seeds & Burrito Sweet Corn Kernels
+      if (i % 2 === 0 || r2 > 0.55) {
+        const cx = curr.x + (r2 - 0.5) * curr.radius * 1.15;
+        const cy = curr.y + (r3 - 0.5) * 8;
+        if (r3 > 0.45) {
+          // Golden Corn Kernel
+          ctx.fillStyle = '#facc15';
+          ctx.strokeStyle = '#a16207';
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 3.2, 2.6, angle + r1, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+          ctx.fillStyle = '#fef9c3';
+          ctx.beginPath();
+          ctx.arc(cx - 0.8, cy - 0.8, 0.9, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Pale Chili Seed
+          ctx.fillStyle = '#fef08a';
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 1.8, 1.3, r1 * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (dietId === 'balanced') {
+      // Morning Oatmeal & Fruit: Rolled Oat Flakes, Corn Kernels & Berry Seed Flecks
+      ctx.save();
+      ctx.translate(px, py);
+      ctx.rotate(angle + (r3 - 0.5) * 1.4);
+      ctx.fillStyle = '#fde68a';
+      ctx.strokeStyle = '#b45309';
+      ctx.lineWidth = 0.8;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 3.6, 1.9, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+
+      // Occasional sweet corn & berry seed specks
+      if (i % 2 === 1) {
+        const cx = curr.x + (r3 - 0.5) * curr.radius * 1.1;
+        const cy = curr.y + (r1 - 0.5) * 7;
+        if (r2 > 0.45) {
+          // Yellow Corn Kernel
+          ctx.fillStyle = '#facc15';
+          ctx.strokeStyle = '#a16207';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.ellipse(cx, cy, 2.9, 2.3, r2, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        } else {
+          // Dark Berry Seed Speck
+          ctx.fillStyle = '#881337';
+          ctx.beginPath();
+          ctx.arc(cx, cy, 1.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+    } else if (dietId === 'mega_fiber') {
+      // Psyllium Husk Mega-Fiber: Woven Golden Wheat Strands & Chia Flecks
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.65)';
+      ctx.lineWidth = 1.6;
+      ctx.lineCap = 'round';
+      const dir = i % 2 === 0 ? 1 : -1;
+      ctx.beginPath();
+      ctx.moveTo(curr.x - curr.radius * 0.72, curr.y - 4 * dir);
+      ctx.quadraticCurveTo(curr.x, curr.y + 3 * dir, curr.x + curr.radius * 0.72, curr.y + 4 * dir);
+      ctx.stroke();
+
+      // Chia & flax specks
+      ctx.fillStyle = r2 > 0.5 ? '#fef3c7' : '#1c1917';
+      ctx.beginPath();
+      ctx.arc(px, py, 1.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (dietId === 'triple_espresso') {
+      // Triple Espresso Crash: Caramel Crema Swirls & Crushed Bean Flecks
+      ctx.save();
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.55)';
+      ctx.lineWidth = 2.1;
+      ctx.lineCap = 'round';
+      ctx.beginPath();
+      ctx.moveTo(curr.x - curr.radius * 0.55, curr.y - 3);
+      ctx.bezierCurveTo(
+        curr.x - 3, curr.y + 4,
+        curr.x + 4, curr.y - 4,
+        curr.x + curr.radius * 0.55, curr.y + 3
+      );
+      ctx.stroke();
+
+      // Dark crushed espresso bean grounds
+      ctx.fillStyle = '#0c0a09';
+      ctx.beginPath();
+      ctx.arc(px, py, 1.3 + r3 * 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+    } else if (dietId === 'cheesy_curry') {
+      // Loaded Chili Mac & Cheese: Cheddar Pockets, Elbow Macaroni & Corn
+      // Creamy melted cheddar swirl
+      ctx.save();
+      ctx.fillStyle = 'rgba(251, 191, 36, 0.52)';
+      ctx.beginPath();
+      ctx.ellipse(
+        curr.x + (r2 - 0.5) * curr.radius * 0.8,
+        curr.y,
+        curr.radius * 0.48,
+        3.2,
+        angle + (r1 - 0.5) * 0.6,
+        0,
+        Math.PI * 2
+      );
+      ctx.fill();
+
+      // Elbow Macaroni Pasta Noodle
+      if (i % 2 === 0 || r1 > 0.35) {
+        ctx.save();
+        ctx.translate(px, py);
+        ctx.rotate(angle + r3 * 2.5);
+        ctx.strokeStyle = '#fde047';
+        ctx.lineWidth = 3.2;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.arc(0, 0, 3.6, 0.2, Math.PI * 0.95);
+        ctx.stroke();
+        ctx.strokeStyle = '#a16207';
+        ctx.lineWidth = 0.9;
+        ctx.beginPath();
+        ctx.arc(0, 0, 5.1, 0.2, Math.PI * 0.95);
+        ctx.stroke();
+        ctx.restore();
+      } else {
+        // Chili Spice Fleck & Corn
+        ctx.fillStyle = r2 > 0.5 ? '#facc15' : '#dc2626';
+        ctx.beginPath();
+        ctx.arc(px, py, r2 > 0.5 ? 2.4 : 1.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+  }
 }
 
 // Emotive cartoon face: eyes, eyebrows, teeth, mouth, crown, quality glints

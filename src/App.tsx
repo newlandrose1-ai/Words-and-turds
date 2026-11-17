@@ -305,6 +305,8 @@ export default function App() {
         qualityBonus,
         emotionsExperiencedCount: emotionsHistory.length,
         unlockedAchievementIds: newlyUnlocked,
+        dietId: selectedDiet.id,
+        dietName: selectedDiet.name,
       };
 
       setLastSnipRecord(record);
@@ -315,7 +317,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 750);
     }, 280);
-  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements]);
+  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements, selectedDiet]);
 
   // The Decisive Regular Snip Action
   const handleSnip = useCallback(() => {
@@ -370,6 +372,8 @@ export default function App() {
         qualityBonus,
         emotionsExperiencedCount: emotionsHistory.length,
         unlockedAchievementIds: newlyUnlocked,
+        dietId: selectedDiet.id,
+        dietName: selectedDiet.name,
       };
 
       setLastSnipRecord(record);
@@ -380,7 +384,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 750);
     }, 350);
-  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements]);
+  }, [gameState, lengthCm, isSnapped, isSnipping, weightGrams, tension, qualityScore, qualityTier, emotionsHistory, saveAchievements, selectedDiet]);
 
   // Handle premature snap
   const triggerPrematureSnap = useCallback(() => {
@@ -411,6 +415,8 @@ export default function App() {
         qualityBonus: 0,
         emotionsExperiencedCount: emotionsHistory.length,
         unlockedAchievementIds: [],
+        dietId: selectedDiet.id,
+        dietName: selectedDiet.name,
       };
       setLastSnipRecord(record);
       saveRecord(record);
@@ -419,7 +425,7 @@ export default function App() {
         setAwaitingFlush(true);
       }, 800);
     }, 400);
-  }, [lengthCm, weightGrams, qualityScore, emotionsHistory]);
+  }, [lengthCm, weightGrams, qualityScore, emotionsHistory, selectedDiet]);
 
   // Save record to local storage
   const saveRecord = (rec: SnipRecord) => {
@@ -950,11 +956,11 @@ export default function App() {
                     sounds.playClick();
                     setGameState('SELECT_DIET');
                   }}
-                  title="Change Pre-Derby Meal"
-                  className="px-2.5 py-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1 shrink-0"
+                  title={`Change Pre-Derby Meal (${selectedDiet.name}: ${selectedDiet.visualVariantLabel})`}
+                  className="px-2.5 py-1.5 text-xs font-bold text-amber-900 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer inline-flex items-center gap-1.5 shrink-0"
                 >
                   <span>{selectedDiet.icon}</span>
-                  <span className="hidden sm:inline">Meal</span>
+                  <span className="hidden sm:inline">{selectedDiet.visualVariantLabel}</span>
                 </button>
 
                 <div className="min-w-0 pl-1">
@@ -1035,6 +1041,7 @@ export default function App() {
                     cleanCut={cleanCut}
                     qualityScore={qualityScore}
                     qualityTier={qualityTier}
+                    dietId={selectedDiet.id}
                     onFlushClick={handleTriggerFlush}
                     onFlushComplete={handleFlushComplete}
                   />

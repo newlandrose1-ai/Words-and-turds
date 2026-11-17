@@ -10,7 +10,9 @@ export const DIET_MODIFIERS: DietModifier[] = [
     tensileStrengthMult: 1.0,
     tensionRiseMult: 1.0,
     bonusWeightMult: 1.0,
-    description: 'Perfect baseline balance. Dependable push rate and solid structural integrity.'
+    description: 'Perfect baseline balance. Dependable push rate and solid structural integrity.',
+    visualVariantLabel: 'Oat Bran & Berry Speckle',
+    visualCue: 'Warm mahogany log studded with rolled oat flakes, berry seeds & sweet corn'
   },
   {
     id: 'ghost_pepper',
@@ -21,7 +23,9 @@ export const DIET_MODIFIERS: DietModifier[] = [
     tensileStrengthMult: 0.85,
     tensionRiseMult: 1.35,
     bonusWeightMult: 1.1,
-    description: 'Blazing ejection velocity! Extreme sphincter tension—snip quickly or face explosive rupture!'
+    description: 'Blazing ejection velocity! Extreme sphincter tension—snip quickly or face explosive rupture!',
+    visualVariantLabel: 'Scorched Crimson & Chili Skin',
+    visualCue: 'Fiery red-brown log packed with red hot chili skins, pepper seeds & corn'
   },
   {
     id: 'mega_fiber',
@@ -32,7 +36,9 @@ export const DIET_MODIFIERS: DietModifier[] = [
     tensileStrengthMult: 1.5,
     tensionRiseMult: 0.75,
     bonusWeightMult: 1.25,
-    description: 'Nearly unbreakable! Push out gigantic unbroken logs with minimal risk of premature snaps.'
+    description: 'Nearly unbreakable! Push out gigantic unbroken logs with minimal risk of premature snaps.',
+    visualVariantLabel: 'Woven Fiber Braid',
+    visualCue: 'Earthy reinforced coil laced with golden wheat strands & chia flecks'
   },
   {
     id: 'triple_espresso',
@@ -43,7 +49,9 @@ export const DIET_MODIFIERS: DietModifier[] = [
     tensileStrengthMult: 0.95,
     tensionRiseMult: 1.2,
     bonusWeightMult: 0.9,
-    description: 'Rapid-fire pump rhythm. Great for quick aggressive bursts in tight competition.'
+    description: 'Rapid-fire pump rhythm. Great for quick aggressive bursts in tight competition.',
+    visualVariantLabel: 'Dark Roast & Crema Swirl',
+    visualCue: 'Glossy dark-roast log marbled with caramel crema streaks & bean grounds'
   },
   {
     id: 'cheesy_curry',
@@ -54,7 +62,9 @@ export const DIET_MODIFIERS: DietModifier[] = [
     tensileStrengthMult: 1.15,
     tensionRiseMult: 1.1,
     bonusWeightMult: 1.4,
-    description: 'Dense and heavy. Produces monstrous gram weights on the scale with each centimeter.'
+    description: 'Dense and heavy. Produces monstrous gram weights on the scale with each centimeter.',
+    visualVariantLabel: 'Cheddar Marble & Macaroni',
+    visualCue: 'Golden cheddar-swirled heavyweight embedded with elbow pasta & corn'
   }
 ];
 
